@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fstream>
+#include <unordered_set>
 
 #include <vulkan/vulkan.hpp>
 #define GLM_FORCE_RADIANS
@@ -11,7 +12,11 @@
 #include <stb_image.h>
 #include "../helpers/arx_logger.hpp"
 #include "../proxy/renderer_proxy.hpp"
+
 #include "vulkan_renderer/swapchain.hpp"
+#include "vulkan_renderer/texture.hpp"
+#include "vulkan_renderer/material.hpp"
+#include "vulkan_renderer/mesh_model.hpp"
 
 //export module vulkan_renderer;
 //export import :texture;
@@ -59,7 +64,7 @@ namespace arx
 			create_swapchains(proxy);
 			create_descriptors();
 			unsigned char pixels[] = { 0, 0, 0, 0 };
-			//Texture::empty = std::make_shared<Texture>(pixels, 1, 1, 4);
+			//defaults.empty_texture = std::make_shared<Texture>(pixels, 1, 1, 4);
 			create_graphics_pipelines();
 			allocate_command_buffers();
 		}
@@ -91,7 +96,7 @@ namespace arx
 		
 			//preservedModels.clear();
 		
-			//Texture::empty = nullptr;
+			//defaults.empty_texture = nullptr;
 		
 			log_step("Vulkan", "Destroying Descriptor Pool");
 			device.destroyDescriptorPool(descriptorPool);
@@ -482,19 +487,19 @@ namespace arx
 		}*/
 
 	public: // concept: RenderingObjectManager.
-		/*auto create_texture(const std::string& path) -> Texture* {
+		auto create_texture(const std::string& path) -> Texture* {
 			int width, height, channels;
-			stb::stbi_uc* pixels = stb::stbi_load(path.c_str(), &width, &height, &channels, stb::STBI_rgb_alpha);
+			stbi_uc* pixels = stbi_load(path.c_str(), &width, &height, &channels, STBI_rgb_alpha);
 			if (!pixels) throw std::runtime_error("Failed to load texture image from file \"" + path + "\".");
 			auto texture = create_texture(pixels, width, height, 4);
-			stb::stbi_image_free(pixels);
+			stbi_image_free(pixels);
 			return texture;
 		}
-		auto create_texture(stb::stbi_uc* pixels, int width, int height, int channels) -> Texture* {
+		auto create_texture(stbi_uc* pixels, int width, int height, int channels) -> Texture* {
 			auto mip_levels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
-			vk::DeviceSize image_size = sizeof(stb::stbi_uc) * width * height * channels;
+			vk::DeviceSize image_size = sizeof(stbi_uc) * width * height * channels;
 			auto [staging_buffer, staging_buffer_memory] =
-				create_buffer(sizeof(stb::stbi_uc), width * height * channels, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+				create_buffer(sizeof(stbi_uc), width * height * channels, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 			auto mapping_memory = map_memory(staging_buffer_memory);
 			std::memcpy(mapping_memory, pixels, static_cast<size_t>(image_size));
 			unmap_memory(staging_buffer_memory);
@@ -525,7 +530,7 @@ namespace arx
 
 			auto texture_image_view = create_image_view(texture_image, image_format, mip_levels);
 
-			vk::SamplerCreateInfo sampler_info({ }, vk::Filter::eLinear, vk::Filter::eLinear, vk::SamplerMipmapMode::eLinear, vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat, 0.f, VK_TRUE, Utils::maxAnisotrophy, VK_FALSE, vk::CompareOp::eAlways, 0.f, static_cast<float>(mip_levels), vk::BorderColor::eIntOpaqueBlack, VK_FALSE);
+			vk::SamplerCreateInfo sampler_info({ }, vk::Filter::eLinear, vk::Filter::eLinear, vk::SamplerMipmapMode::eLinear, vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat, vk::SamplerAddressMode::eRepeat, 0.f, VK_TRUE, max_anisotrophy, VK_FALSE, vk::CompareOp::eAlways, 0.f, static_cast<float>(mip_levels), vk::BorderColor::eIntOpaqueBlack, VK_FALSE);
 			auto texture_sampler = device.createSampler(sampler_info);
 
 			return new Texture{ mip_levels, texture_image_view, texture_sampler, texture_image, texture_image_memory };
@@ -546,7 +551,7 @@ namespace arx
 			copy_buffer(property_buffer, staging_buffer, sizeof(MaterialPropertyBufferObject));
 			destroy_buffer(staging_buffer, staging_buffer_memory);
 
-			std::array<vk::DescriptorSetLayout, 1> layouts{ material_descriptor_set_layout };
+			std::array<vk::DescriptorSetLayout, 1> layouts{ descriptor_set_layouts.material_descriptor_set_layout };
 			vk::DescriptorSetAllocateInfo allo_info(descriptorPool, layouts);
 			auto descriptor_set = device.allocateDescriptorSets(allo_info)[0];
 
@@ -567,7 +572,7 @@ namespace arx
 			}
 			else
 			{
-				diffuse_map_info = { Texture::empty->texture_sampler, Texture::empty->texture_image_view, vk::ImageLayout::eShaderReadOnlyOptimal };
+				diffuse_map_info = { defaults.empty_texture->texture_sampler, defaults.empty_texture->texture_image_view, vk::ImageLayout::eShaderReadOnlyOptimal };
 				descriptor_writes.push_back({ descriptor_set, 1, 0, 1, vk::DescriptorType::eCombinedImageSampler, &diffuse_map_info });
 			}
 
@@ -578,7 +583,7 @@ namespace arx
 			}
 			else
 			{
-				normal_map_info = { Texture::empty->texture_sampler, Texture::empty->texture_image_view, vk::ImageLayout::eShaderReadOnlyOptimal };
+				normal_map_info = { defaults.empty_texture->texture_sampler, defaults.empty_texture->texture_image_view, vk::ImageLayout::eShaderReadOnlyOptimal };
 				descriptor_writes.push_back({ descriptor_set, 2, 0, 1, vk::DescriptorType::eCombinedImageSampler, &normal_map_info });
 			}
 
@@ -591,7 +596,7 @@ namespace arx
 				normal_map,
 			};
 		}
-		auto create_bitmap(Texture* map) -> Bitmap* {
+		/*auto create_bitmap(Texture* map) -> Bitmap* {
 			std::array<vk::DescriptorSetLayout, 1> layouts{ descriptor_set_layouts.bitmap_descriptor_set_layout };
 			vk::DescriptorSetAllocateInfo allo_info(descriptorPool, layouts);
 			auto descriptor_set = device.allocateDescriptorSets(allo_info)[0];
@@ -675,9 +680,11 @@ namespace arx
 			}
 
 			return create_mesh_model(vertices, indices);
-		}
-		auto create_mesh_model(const std::vector<MeshModel::Vertex>& vertices, const std::vector<uint32_t> indices) -> MeshModel* {
-			calculate_tangent_bitangent(vertices, indices);
+		}*/
+		auto create_mesh_model(std::vector<MeshModel::Vertex>& vertices, const std::vector<uint32_t> indices, bool calculate_tbn = true) -> MeshModel* {
+			if (calculate_tbn) {
+				calculate_tangent_bitangent(vertices, indices);
+			}
 			// VertexBuffer
 			auto vertex_count = static_cast<uint32_t>(vertices.size());
 			vk::DeviceSize buffer_size = sizeof(MeshModel::Vertex) * vertex_count;
@@ -715,29 +722,10 @@ namespace arx
 			return new MeshModel{ vertex_count, index_count, vertex_buffer, vertex_buffer_memory, index_buffer, index_buffer_memory };
 		}
 		auto create_mesh_model(const MeshModel::Builder& builder, Material* material) -> MeshModel* {
-			std::vector<Vertex> buildVertices;
-			std::vector<uint32_t> buildIndices;
-			std::vector<uint32_t> vertices_to_buildVertices_map(static_cast<size_t>(vertices.size()));
-
-			for (uint32_t v = 0; v < vertices.size(); ++v)
-			{
-				vertices_to_buildVertices_map[v] = static_cast<uint32_t>(buildVertices.size());
-				if (!removedVertices.contains(v))
-				{
-					buildVertices.push_back(vertices[v]);
-				}
-			}
-
-			for (auto& triangle : triangles)
-			{
-				auto [v1, v2, v3] = triangle;
-				buildIndices.push_back(vertices_to_buildVertices_map[v1]);
-				buildIndices.push_back(vertices_to_buildVertices_map[v2]);
-				buildIndices.push_back(vertices_to_buildVertices_map[v3]);
-			}
-			return create_mesh_model(buildVertices, buildIndices);
+			auto [build_vertices, build_indices] = builder.build();
+			return create_mesh_model(build_vertices, build_indices);
 		}
-		auto create_text_model(const std::string& text, Material* material, Bitmap* bitmap, float height = 0.1f) -> TextModel* {
+		/*auto create_text_model(const std::string& text, Material* material, Bitmap* bitmap, float height = 0.1f) -> TextModel* {
 			float scale = height / 150.f;
 
 			std::vector<TextModel::Vertex> text_vertices;
@@ -1062,7 +1050,7 @@ namespace arx
 			log_info("Vulkan", ("Physical Device Name : " + static_cast<std::string>(properties.deviceName.data())), 0);
 			log_info("Vulkan", std::format("Push Constant Limit : {}", properties.limits.maxPushConstantsSize), 0);
 			log_info("Vulkan", std::format("Max Anisotropy : {}", properties.limits.maxSamplerAnisotropy), 0);
-			//Utils::maxAnisotrophy = properties.limits.maxSamplerAnisotropy;
+			max_anisotrophy = properties.limits.maxSamplerAnisotropy;
 			auto features = physicalDevice.getFeatures();
 		}
 		auto create_logical_device(P& proxy) -> void {
@@ -1300,8 +1288,8 @@ namespace arx
 
 			vk::PipelineDynamicStateCreateInfo dynamicStateInfo({ }, dynamicStates);
 
-			auto meshVertexBindingDescriptions = std::vector<vk::VertexInputBindingDescription>{ };//MeshModel::Vertex::getBindingDescriptions();
-			auto meshVertexAttributeDescriptions = std::vector<vk::VertexInputAttributeDescription>{ };//MeshModel::Vertex::getAttributeDescriptions();
+			auto meshVertexBindingDescriptions = MeshModel::Vertex::get_binding_descriptions();
+			auto meshVertexAttributeDescriptions = MeshModel::Vertex::get_attribute_descriptions();
 			vk::PipelineVertexInputStateCreateInfo meshVertexInputInfo{ { }, meshVertexBindingDescriptions, meshVertexAttributeDescriptions };
 
 			auto textVertexBindingDescriptions = std::vector<vk::VertexInputBindingDescription>{ };//TextModel::TextVertex::getBindingDescriptions();
@@ -1421,102 +1409,102 @@ namespace arx
 			log_success();
 		}
 
-				/*auto load_game_object_from_files(std::string name) -> hd::GameObject {	// May creates multiple textures and models, but only a single gameObject.
-					std::string modelDirectory = "models/" + name;
-					std::string textureDirectory = modelDirectory + "/textures";
-					std::string modelPath = modelDirectory + '/' + name + ".obj";
+		/*auto load_game_object_from_files(std::string name) -> hd::GameObject {	// May creates multiple textures and models, but only a single gameObject.
+			std::string modelDirectory = "models/" + name;
+			std::string textureDirectory = modelDirectory + "/textures";
+			std::string modelPath = modelDirectory + '/' + name + ".obj";
 
-					tinyobj::attrib_t attrib;
-					std::vector<tinyobj::shape_t> shapes;
-					std::vector<tinyobj::material_t> materials;
-					std::string warn, err;
+			tinyobj::attrib_t attrib;
+			std::vector<tinyobj::shape_t> shapes;
+			std::vector<tinyobj::material_t> materials;
+			std::string warn, err;
 
-					log_step("Vulkan", "Loading Model File");
-					if (!tinyobj::loadObj(&attrib, &shapes, &materials, &warn, &err, modelPath.c_str(), modelDirectory.c_str()))
+			log_step("Vulkan", "Loading Model File");
+			if (!tinyobj::loadObj(&attrib, &shapes, &materials, &warn, &err, modelPath.c_str(), modelDirectory.c_str()))
+			{
+				throw std::runtime_error(warn + err);
+			}
+			log_success();
+
+			std::vector<hd::Material> mates;
+			std::unordered_set<hd::MeshModel> modls;
+
+			log_step("Vulkan", "Creating Textures");
+			for (auto& material : materials)
+			{
+				auto diffuseTex = material.diffuse_texname == "" ? nullptr : std::make_shared<Texture>(textureDirectory + '/' + material.diffuse_texname);
+				auto normalTex = material.bump_texname == "" ? nullptr : std::make_shared<Texture>(textureDirectory + '/' + material.bump_texname);
+				mates.push_back(std::make_shared<Material>(diffuseTex, normalTex));
+			}
+			log_success();
+
+			std::vector<Vertex> vertices;
+			std::vector<uint32_t> indices;
+			std::unordered_map<Vertex, uint32_t> uniqueVertices;
+
+			int shapeCount = 0;
+			int materialId = shapes[0].mesh.material_ids[0];	// assume that all faces in a shape have the same material.
+
+			log_step("Vulkan", "Creating Models");
+			for (const auto& shape : shapes)
+			{
+				for (const auto& index : shape.mesh.indices)
+				{
+					Vertex vertex{ };
+
+					vertex.position = {
+						attrib.vertices[3 * index.vertex_index + 0],
+						attrib.vertices[3 * index.vertex_index + 1],
+						attrib.vertices[3 * index.vertex_index + 2],
+					};
+
+					vertex.normal = {
+						attrib.normals[3 * index.normal_index + 0],
+						attrib.normals[3 * index.normal_index + 1],
+						attrib.normals[3 * index.normal_index + 2],
+					};
+
+					vertex.uv = {
+						attrib.texcoords[2 * index.texcoord_index + 0],
+						1.f - attrib.texcoords[2 * index.texcoord_index + 1],
+					};
+
+					if (uniqueVertices.count(vertex) == 0)
 					{
-						throw std::runtime_error(warn + err);
+						uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+						vertices.push_back(vertex);
 					}
-					log_success();
 
-					std::vector<hd::Material> mates;
-					std::unordered_set<hd::MeshModel> modls;
+					indices.push_back(uniqueVertices[vertex]);
+				}
 
-					log_step("Vulkan", "Creating Textures");
-					for (auto& material : materials)
-					{
-						auto diffuseTex = material.diffuse_texname == "" ? nullptr : std::make_shared<Texture>(textureDirectory + '/' + material.diffuse_texname);
-						auto normalTex = material.bump_texname == "" ? nullptr : std::make_shared<Texture>(textureDirectory + '/' + material.bump_texname);
-						mates.push_back(std::make_shared<Material>(diffuseTex, normalTex));
-					}
-					log_success();
+				if (++shapeCount >= shapes.size())	// last shape.
+				{
+					modls.insert(std::make_shared<MeshModel>(vertices, indices, mates[materialId]));	// make current model.
+					// no need to manually clear the containers.
+				}
+				else if (materialId != shapes[shapeCount].mesh.material_ids[0])	// the next shape has different texture.
+				{
+					modls.insert(std::make_shared<MeshModel>(vertices, indices, mates[materialId]));	// make current model.
+					vertices.clear();	// clear.
+					indices.clear();
+					uniqueVertices.clear();
+					materialId = shapes[shapeCount].mesh.material_ids[0];	// set material for the next shape.
+				}
+			}
+			log_success();
 
-					std::vector<Vertex> vertices;
-					std::vector<uint32_t> indices;
-					std::unordered_map<Vertex, uint32_t> uniqueVertices;
+			log_info("Vulkan", std::format("Loaded {} textures and {} models", mates.size(), modls.size()), 0);
 
-					int shapeCount = 0;
-					int materialId = shapes[0].mesh.material_ids[0];	// assume that all faces in a shape have the same material.
-
-					log_step("Vulkan", "Creating Models");
-					for (const auto& shape : shapes)
-					{
-						for (const auto& index : shape.mesh.indices)
-						{
-							Vertex vertex{ };
-
-							vertex.position = {
-								attrib.vertices[3 * index.vertex_index + 0],
-								attrib.vertices[3 * index.vertex_index + 1],
-								attrib.vertices[3 * index.vertex_index + 2],
-							};
-
-							vertex.normal = {
-								attrib.normals[3 * index.normal_index + 0],
-								attrib.normals[3 * index.normal_index + 1],
-								attrib.normals[3 * index.normal_index + 2],
-							};
-
-							vertex.uv = {
-								attrib.texcoords[2 * index.texcoord_index + 0],
-								1.f - attrib.texcoords[2 * index.texcoord_index + 1],
-							};
-
-							if (uniqueVertices.count(vertex) == 0)
-							{
-								uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-								vertices.push_back(vertex);
-							}
-
-							indices.push_back(uniqueVertices[vertex]);
-						}
-
-						if (++shapeCount >= shapes.size())	// last shape.
-						{
-							modls.insert(std::make_shared<MeshModel>(vertices, indices, mates[materialId]));	// make current model.
-							// no need to manually clear the containers.
-						}
-						else if (materialId != shapes[shapeCount].mesh.material_ids[0])	// the next shape has different texture.
-						{
-							modls.insert(std::make_shared<MeshModel>(vertices, indices, mates[materialId]));	// make current model.
-							vertices.clear();	// clear.
-							indices.clear();
-							uniqueVertices.clear();
-							materialId = shapes[shapeCount].mesh.material_ids[0];	// set material for the next shape.
-						}
-					}
-					log_success();
-
-					log_info("Vulkan", std::format("Loaded {} textures and {} models", mates.size(), modls.size()), 0);
-
-					hd::GameObject obj = std::make_shared<GameObject>();
-					obj->models = std::move(modls);
-					return obj;
-				}*/
+			hd::GameObject obj = std::make_shared<GameObject>();
+			obj->models = std::move(modls);
+			return obj;
+		}*/
 
 	public: // helper functions.
 		auto create_buffer(vk::DeviceSize instance_size, uint32_t instance_count,
 			vk::BufferUsageFlags usage_flags, vk::MemoryPropertyFlags memory_property_flags,
-			vk::DeviceSize min_offset_alignment) -> std::tuple<vk::Buffer, vk::DeviceMemory>
+			vk::DeviceSize min_offset_alignment = 1) -> std::tuple<vk::Buffer, vk::DeviceMemory>
 		{
 			vk::DeviceSize buffer_size = get_alignment(instance_size, min_offset_alignment) * instance_count;
 
@@ -1535,7 +1523,7 @@ namespace arx
 			// Return
 			return std::make_tuple(buffer, memory);
 		}
-		auto create_image(vk::ImageCreateInfo& image_info, vk::MemoryPropertyFlags memory_property_flags)
+		auto create_image(vk::ImageCreateInfo& image_info, vk::MemoryPropertyFlags memory_property_flags) -> std::tuple<vk::Image, vk::DeviceMemory>
 		{
 			// Image
 			vk::Image image = device.createImage(image_info);
@@ -1551,7 +1539,7 @@ namespace arx
 			// Return
 			return std::make_tuple(image, memory);
 		}
-		auto copy_buffer(vk::Buffer& dst_buffer, vk::Buffer& src_buffer, vk::DeviceSize size)
+		auto copy_buffer(vk::Buffer& dst_buffer, vk::Buffer& src_buffer, vk::DeviceSize size) -> void
 		{
 			auto command_buffer = begin_single_time_command_buffer();
 
@@ -1601,7 +1589,7 @@ namespace arx
 			throw std::runtime_error("Failed to find memory type.");
 			return 0;
 		}
-		auto map_memory(vk::DeviceMemory memory, vk::DeviceSize size, vk::DeviceSize offset) -> void*
+		auto map_memory(vk::DeviceMemory memory, vk::DeviceSize size = VK_WHOLE_SIZE, vk::DeviceSize offset = 0) -> void*
 		{
 			return device.mapMemory(memory, offset, size);
 		}
@@ -1691,7 +1679,7 @@ namespace arx
 
 			end_single_time_command_buffer(command_buffer);
 		}
-		auto create_image_view(vk::Image& image, vk::Format format, uint32_t mip_levels, vk::ImageAspectFlags aspect_flags) -> vk::ImageView
+		auto create_image_view(vk::Image& image, vk::Format format, uint32_t mip_levels = 1, vk::ImageAspectFlags aspect_flags = vk::ImageAspectFlagBits::eColor) -> vk::ImageView
 		{
 			vk::ImageViewCreateInfo view_info({}, image, vk::ImageViewType::e2D, format, { }, { aspect_flags, 0, mip_levels, 0, 1 });
 			return device.createImageView(view_info);
@@ -1751,7 +1739,7 @@ namespace arx
 			return new Swapchain{ length, images, image_views, framebuffers, depth_image, depth_image_memory, depth_image_view, format, rect };
 		}
 
-		/*auto calculate_tangent_bitangent(std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices)
+		auto calculate_tangent_bitangent(std::vector<MeshModel::Vertex>& vertices, const std::vector<uint32_t>& indices) -> void
 		{
 			if (indices.size() % 3 != 0)
 			{
@@ -1769,9 +1757,9 @@ namespace arx
 				++count[index1];
 				++count[index2];
 
-				Vertex& v0 = vertices[index0];
-				Vertex& v1 = vertices[index1];
-				Vertex& v2 = vertices[index2];
+				MeshModel::Vertex& v0 = vertices[index0];
+				MeshModel::Vertex& v1 = vertices[index1];
+				MeshModel::Vertex& v2 = vertices[index2];
 
 				glm::vec3& p0 = v0.position;
 				glm::vec3& p1 = v1.position;
@@ -1806,8 +1794,7 @@ namespace arx
 				vertices[i].tangent /= count[i];
 				vertices[i].bitangent /= count[i];
 			}
-		}*/
-
+		}
 
 		auto begin_single_time_command_buffer() -> vk::CommandBuffer
 		{
@@ -1853,6 +1840,7 @@ namespace arx
 	private: // Owning. Responsible to destroy them. Or value types.
 		vk::Instance instance;
 		vk::PhysicalDevice physicalDevice;
+		float max_anisotrophy;
 		vk::Device device;
 		uint32_t queueFamilyIndex;
 		vk::Queue queue;
@@ -1872,6 +1860,9 @@ namespace arx
 			vk::Pipeline uiPipeline;
 			vk::Pipeline shadowPipeline;
 		} pipelines;
+		struct {
+			Texture* empty_texture;
+		} defaults;
 		vk::CommandPool commandPool;
 		std::vector<vk::CommandBuffer> commandBuffers;
 		// std::vector<std::vector<hd::MeshModel>> preservedModels;	// models are preserved by a commandBuffer when they are being drawn.
