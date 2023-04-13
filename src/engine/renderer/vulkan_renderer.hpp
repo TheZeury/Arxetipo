@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <unordered_set>
+#include <set>
 
 #include <vulkan/vulkan.hpp>
 #define GLM_FORCE_RADIANS
@@ -14,6 +15,7 @@
 #include "../helpers/arx_logger.hpp"
 #include "../helpers/arx_math.hpp"
 #include "../proxy/renderer_proxy.hpp"
+#include "../common_objects/common_objects.hpp"
 
 #include "vulkan_renderer/swapchain.hpp"
 #include "vulkan_renderer/texture.hpp"
@@ -314,15 +316,34 @@ namespace arx
 					}
 
 				}*/
-				glm::mat4 model_matrix = glm::mat4(1.0f); model_matrix[3] = glm::vec4(0.0f, 0.0f, -2.0f, 1.0f);
-				std::array<PushConstantData, 1> data;
-				data[0].modelMatrix = model_matrix;
-				data[0].projectionView = mat_projection * no_camera_view * model_matrix;
-				command_buffers[view].pushConstants<PushConstantData>(pipeline_layouts.world_pipeline_layout, vk::ShaderStageFlagBits::eVertex, 0, data);
-				command_buffers[view].bindVertexBuffers(0, { defaults.sample_sphere->vertex_buffer }, { vk::DeviceSize(0) });
-				command_buffers[view].bindIndexBuffer(defaults.sample_sphere->index_buffer, 0, vk::IndexType::eUint32);
-				command_buffers[view].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline_layouts.world_pipeline_layout, 0, { defaults.default_material->descriptor_set }, { });
-				command_buffers[view].drawIndexed(defaults.sample_sphere->index_count, 1, 0, 0, 0);
+				struct { Material* material; MeshModel* mesh_model; SpaceTransform* transform; } last = { nullptr, nullptr, nullptr };
+				for (auto& models : mesh_models)
+				{
+					
+					for (auto [material, mesh_model, transform] : *models)
+					{
+						if (material != last.material) {
+							last.material = material;
+							command_buffers[view].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline_layouts.world_pipeline_layout, 0, { material->descriptor_set }, { });
+						}
+						if (mesh_model != last.mesh_model) {
+							last.mesh_model = mesh_model;
+							command_buffers[view].bindVertexBuffers(0, { mesh_model->vertex_buffer }, { vk::DeviceSize(0) });
+							command_buffers[view].bindIndexBuffer(mesh_model->index_buffer, 0, vk::IndexType::eUint32);
+						}
+						if (transform != last.transform) {
+							last.transform = transform;
+							glm::mat4 model_matrix = transform->get_global_matrix();
+							std::array<PushConstantData, 1> data;
+							data[0].modelMatrix = model_matrix;
+							data[0].projectionView = mat_projection * no_camera_view * model_matrix;
+							command_buffers[view].pushConstants<PushConstantData>(pipeline_layouts.world_pipeline_layout, vk::ShaderStageFlagBits::eVertex, 0, data);
+						}
+						command_buffers[view].drawIndexed(mesh_model->index_count, 1, 0, 0, 0);
+					}
+				}
+				
+				
 				// End Draw.
 			}
 
@@ -1856,6 +1877,12 @@ namespace arx
 			file.close();
 			return buffer;
 		}
+		
+		struct {
+			Texture* empty_texture;
+			Material* default_material;
+			MeshModel* sample_sphere;
+		} defaults;
 
 	private: // Owning. Responsible to destroy them. Or value types.
 		vk::Instance instance;
@@ -1880,11 +1907,6 @@ namespace arx
 			vk::Pipeline uiPipeline;
 			vk::Pipeline shadowPipeline;
 		} pipelines;
-		struct {
-			Texture* empty_texture;
-			Material* default_material;
-			MeshModel* sample_sphere;
-		} defaults;
 		vk::CommandPool command_pool;
 		std::vector<vk::CommandBuffer> command_buffers;
 		// std::vector<std::vector<hd::MeshModel>> preservedModels;	// models are preserved by a commandBuffer when they are being drawn.
@@ -1902,6 +1924,7 @@ namespace arx
 		uint32_t mirrorImageHeight = 1440ui32;
 #endif
 
-	private: // Not Owning. Don't try to destroy them. (But it's ok to destruct since they are handle classes instead of pointers.)
+	public: // Not Owning. Don't try to destroy them.
+		std::unordered_set<std::multiset<std::tuple<Material*, MeshModel*, SpaceTransform*>>*> mesh_models;	// What a crazy type :D
 	};
 }
