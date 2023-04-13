@@ -1,3 +1,5 @@
+#pragma once
+
 namespace arx
 {
 	template<typename returnType, typename originalType>

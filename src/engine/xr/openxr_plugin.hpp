@@ -193,7 +193,7 @@ namespace arx
 						glm::mat4 mat_projection;		// P
 						XrMatrix4x4f_CreateProjectionFov(&cnv<XrMatrix4x4f>(mat_projection), GRAPHICS_VULKAN, views[i].fov, DEFAULT_NEAR_Z, INFINITE_FAR_Z);
 
-						graphics.render_view_xr(mat_projection, i, imageIndex); // Renderer.
+						graphics.render_view_xr(mat_projection, projectionLayerViews[i].pose, i, imageIndex); // Renderer.
 
 						swapChain.releaseSwapchainImage({ });
 					}
@@ -241,7 +241,8 @@ namespace arx
 			}
 
 			std::vector<const char*> extensions;
-			extensions.push_back(XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME);
+			auto render_extensions = P::get_renderer_specific_xr_extensions();
+			extensions.insert(extensions.end(), render_extensions.begin(), render_extensions.end());
 			log_info("OpenXR", std::format("List of total {} required Extension(s)", extensions.size()), 0);
 			for (const auto& ext : extensions)
 			{
@@ -250,9 +251,9 @@ namespace arx
 
 			log_step("OpenXR", "Creating OpenXR Instance");
 			xr::ApplicationInfo appInfo(
-				"Naive OpenXR Game",
+				"Arxetipo",
 				1,
-				"No Engine",
+				"Arxetipo Engine",
 				1,
 				xr::Version::current()
 			);
@@ -304,7 +305,7 @@ namespace arx
 			log_success();
 		}
 
-		auto create_session(typename P::GraphicsBindingType graphicsBinding) -> void {
+		auto create_session(P::GraphicsBindingType graphicsBinding) -> void {
 			log_step("OpenXR", "Creating OpenXR Session");
 			xr::SessionCreateInfo createInfo({}, systemId, &graphicsBinding);
 			session = instance.createSession(createInfo);

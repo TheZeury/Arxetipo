@@ -10,7 +10,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/hash.hpp>
 #include <stb_image.h>
+#include <OpenXR-SDK/src/common/xr_linear.h>
 #include "../helpers/arx_logger.hpp"
+#include "../helpers/arx_math.hpp"
 #include "../proxy/renderer_proxy.hpp"
 
 #include "vulkan_renderer/swapchain.hpp"
@@ -63,10 +65,9 @@ namespace arx
 		auto initialize_session(P& proxy) -> void {
 			create_swapchains(proxy);
 			create_descriptors();
-			unsigned char pixels[] = { 0, 0, 0, 0 };
-			//defaults.empty_texture = std::make_shared<Texture>(pixels, 1, 1, 4);
 			create_graphics_pipelines();
 			allocate_command_buffers();
+			create_default_resources();
 		}
 		auto clean_up_instance() -> void {
 			queue.waitIdle();
@@ -99,7 +100,7 @@ namespace arx
 			//defaults.empty_texture = nullptr;
 		
 			log_step("Vulkan", "Destroying Descriptor Pool");
-			device.destroyDescriptorPool(descriptorPool);
+			device.destroyDescriptorPool(descriptor_pool);
 			log_success();
 		
 			log_step("Vulkan", "Destroying Descriptor Set Layout");
@@ -107,47 +108,47 @@ namespace arx
 			log_success();
 		
 			log_step("Vulkan", "Destroying Fences");
-			for (auto& fence : inFlights)
+			for (auto& fence : in_flights)
 			{
 				device.destroyFence(fence);
 			}
 			log_success();
 		
 			log_step("Vulkan", "Destroying Command Buffers");
-			device.freeCommandBuffers(commandPool, commandBuffers);
+			device.freeCommandBuffers(command_pool, command_buffers);
 			log_success();
 		
 		
 			log_step("Vulkan", "Destroying Command Pool");
-			device.destroyCommandPool(commandPool);
+			device.destroyCommandPool(command_pool);
 			log_success();
 		
 			log_step("Vulkan", "Destroying Swap Chains");
-			swapChains.clear();
+			swap_chains.clear();
 			log_success();
 		
 			log_step("Vulkan", "Destroying Pipeline");
 			device.destroyPipeline(pipelines.textPipeline);
-			device.destroyPipeline(pipelines.meshPipeline);
+			device.destroyPipeline(pipelines.mesh_pipeline);
 			device.destroyPipeline(pipelines.wireframePipeline);
 			log_success();
 		
 			log_step("Vulkan", "Destroying Pipeline Layout");
-			device.destroyPipelineLayout(pipelineLayouts.worldPipelineLayout);
+			device.destroyPipelineLayout(pipeline_layouts.world_pipeline_layout);
 			log_success();
 		
 		
 			log_step("Vulkan", "Destroying Render Pass");
-			device.destroyRenderPass(renderPass);
+			device.destroyRenderPass(render_pass);
 			log_success();
 		}
-		auto render_view_xr(const glm::mat4& matProjection, uint32_t view, uint32_t imageIndex) { }/* -> void
+		auto render_view_xr(const glm::mat4& mat_projection, xr::Posef pose, uint32_t view, uint32_t imageIndex) -> void
 		{
-			if (device.waitForFences(1, &inFlights[view], VK_TRUE, UINT64_MAX) != vk::Result::eSuccess)
+			if (device.waitForFences(1, &in_flights[view], VK_TRUE, UINT64_MAX) != vk::Result::eSuccess)
 			{
 				throw std::runtime_error("Failed to wait for fences.");
 			}
-			if (device.resetFences(1, &inFlights[view]) != vk::Result::eSuccess)
+			if (device.resetFences(1, &in_flights[view]) != vk::Result::eSuccess)
 			{
 				throw std::runtime_error("Failed to reset Fences.");
 			}
@@ -159,54 +160,54 @@ namespace arx
 
 			//preservedModels[view].clear();
 
-			commandBuffers[view].reset();
+			command_buffers[view].reset();
 
 			vk::CommandBufferBeginInfo beginInfo{ };
-			commandBuffers[view].begin(beginInfo);	// <======= Command Buffer Begin.
+			command_buffers[view].begin(beginInfo);	// <======= Command Buffer Begin.
 
-			commandBuffers[view].beginRenderPass(swapChains[view]->getRenderPassBeginInfo(imageIndex), vk::SubpassContents::eInline);		// <======= Render Pass Begin.
+			command_buffers[view].beginRenderPass(swap_chains[view]->get_render_pass_begin_info(imageIndex), vk::SubpassContents::eInline);		// <======= Render Pass Begin.
 
 			//const auto pose = projectionView.pose.get();
 			//XrMatrix4x4f matProjection;		// P
 			//XrMatrix4x4f_CreateProjectionFov(&matProjection, GRAPHICS_VULKAN, projectionView.fov, DEFAULT_NEAR_Z, INFINITE_FAR_Z);
 
-			std::vector<hd::Scene> scenes;
+			//std::vector<hd::Scene> scenes;
 			bool haveText = false;
-			bool haveMesh = false;
+			bool haveMesh = true;
 			bool haveUI = false;
 			bool haveDebug = false;
 
-			XrMatrix4x4f noCameraInvView;
-			XrVector3f identity{ 1.f, 1.f, 1.f };
-			XrMatrix4x4f_CreateTranslationRotationScale(&noCameraInvView, &(pose->position), &(pose->orientation), &identity);
-			XrMatrix4x4f noCameraView;
-			XrMatrix4x4f_InvertRigidBody(&noCameraView, &noCameraInvView);
+			glm::mat4 no_camera_inv_view;
+			glm::vec3 identity{ 1.f, 1.f, 1.f };
+			XrMatrix4x4f_CreateTranslationRotationScale(&cnv<XrMatrix4x4f>(no_camera_inv_view), &(pose.get()->position), &(pose.get()->orientation), &cnv<XrVector3f>(identity));
+			glm::mat4 no_camera_view;
+			XrMatrix4x4f_InvertRigidBody(&cnv<XrMatrix4x4f>(no_camera_view), &cnv<XrMatrix4x4f>(no_camera_inv_view));
 
-			for (auto it = this->scenes.begin(); it != this->scenes.end(); )
-			{
-				auto scene = it->lock();
-				if (scene == nullptr)
-				{
-					it = this->scenes.erase(it);
-					continue;
-				}
-				++it;
+			//for (auto it = this->scenes.begin(); it != this->scenes.end(); )
+			//{
+			//	auto scene = it->lock();
+			//	if (scene == nullptr)
+			//	{
+			//		it = this->scenes.erase(it);
+			//		continue;
+			//	}
+			//	++it;
 
-				scenes.push_back(scene);
+			//	scenes.push_back(scene);
 
-				haveText |= !(scene->debugMode == SceneDebugMode::eDebugOnly || scene->texts.empty());
-				haveMesh |= !(scene->debugMode == SceneDebugMode::eDebugOnly || scene->models.empty());
-				haveUI |= !(scene->uiElements.empty());	// No `scene->onlyDebug` like above because we till want to have UI even in debug view.
-				haveDebug |= debugOn(scene->debugMode) && !(scene->debugScene == nullptr || scene->debugScene->models.empty());
+			//	haveText |= !(scene->debugMode == SceneDebugMode::eDebugOnly || scene->texts.empty());
+			//	haveMesh |= !(scene->debugMode == SceneDebugMode::eDebugOnly || scene->models.empty());
+			//	haveUI |= !(scene->uiElements.empty());	// No `scene->onlyDebug` like above because we till want to have UI even in debug view.
+			//	haveDebug |= debugOn(scene->debugMode) && !(scene->debugScene == nullptr || scene->debugScene->models.empty());
 
-				if (!scene->cameraTransform.expired())
-				{
-					scene->cameraTransform.lock()->setLocalPosition(*(glm::vec3*)(&(pose->position)));
-					scene->cameraTransform.lock()->setLocalRotation(*(glm::quat*)(&(pose->orientation)));
-				}
-			}
+			//	if (!scene->cameraTransform.expired())
+			//	{
+			//		scene->cameraTransform.lock()->setLocalPosition(*(glm::vec3*)(&(pose->position)));
+			//		scene->cameraTransform.lock()->setLocalRotation(*(glm::quat*)(&(pose->orientation)));
+			//	}
+			//}
 
-			if (haveText)
+			/*if (haveText)
 			{
 				commandBuffers[view].bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.textPipeline);			// <======= Bind Text Pipeline.
 
@@ -259,18 +260,18 @@ namespace arx
 					}
 				}
 				// End Draw.
-			}
+			}*/
 
 			if (haveMesh)
 			{
-				commandBuffers[view].bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.meshPipeline);			// <======= Bind Mesh Pipeline.
+				command_buffers[view].bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.mesh_pipeline);			// <======= Bind Mesh Pipeline.
 
-				commandBuffers[view].setViewport(0, 1, swapChains[view]->getViewport());		// <======== Set Viewports.
+				command_buffers[view].setViewport(0, 1, swap_chains[view]->getViewport());		// <======== Set Viewports.
 
-				commandBuffers[view].setScissor(0, 1, swapChains[view]->getScissor());		// <======== Set Scissors.
+				command_buffers[view].setScissor(0, 1, swap_chains[view]->getScissor());		// <======== Set Scissors.
 
 				// Draw something.
-				for (auto scene : scenes)
+				/*for (auto scene : scenes)
 				{
 					if (scene->debugMode == SceneDebugMode::eDebugOnly || scene->models.empty()) continue;
 
@@ -311,11 +312,21 @@ namespace arx
 
 						model->draw(commandBuffers[view]);
 					}
-				}
+
+				}*/
+				glm::mat4 model_matrix = glm::mat4(1.0f); model_matrix[3] = glm::vec4(0.0f, 0.0f, -2.0f, 1.0f);
+				std::array<PushConstantData, 1> data;
+				data[0].modelMatrix = model_matrix;
+				data[0].projectionView = mat_projection * no_camera_view * model_matrix;
+				command_buffers[view].pushConstants<PushConstantData>(pipeline_layouts.world_pipeline_layout, vk::ShaderStageFlagBits::eVertex, 0, data);
+				command_buffers[view].bindVertexBuffers(0, { defaults.sample_sphere->vertex_buffer }, { vk::DeviceSize(0) });
+				command_buffers[view].bindIndexBuffer(defaults.sample_sphere->index_buffer, 0, vk::IndexType::eUint32);
+				command_buffers[view].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline_layouts.world_pipeline_layout, 0, { defaults.default_material->descriptor_set }, { });
+				command_buffers[view].drawIndexed(defaults.sample_sphere->index_count, 1, 0, 0, 0);
 				// End Draw.
 			}
 
-			if (haveUI)
+			/*if (haveUI)
 			{
 				commandBuffers[view].bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.uiPipeline);			// <======= Bind UI Pipeline.
 
@@ -367,9 +378,9 @@ namespace arx
 					}
 				}
 				// End Draw.
-			}
+			}*/
 
-			if (haveDebug)
+			/*if (haveDebug)
 			{
 				commandBuffers[view].bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.wireframePipeline);			// <======= Bind Wireframe Pipeline.
 
@@ -423,9 +434,9 @@ namespace arx
 					}
 				}
 				// End Draw.
-			}
+			}*/;
 
-			commandBuffers[view].endRenderPass();		// <========= Render Pass End.
+			command_buffers[view].endRenderPass();		// <========= Render Pass End.
 
 #ifdef MIRROR_WINDOW
 			if (view == mirrorView && !iconified)
@@ -461,9 +472,9 @@ namespace arx
 			}
 #endif // MIRROR_WINDOW
 
-			commandBuffers[view].end();		// <========= Command Buffer End.
+			command_buffers[view].end();		// <========= Command Buffer End.
 
-			vk::SubmitInfo submitInfo{ }; submitInfo.commandBufferCount = 1; submitInfo.pCommandBuffers = &commandBuffers[view];
+			vk::SubmitInfo submit_info{ }; submit_info.commandBufferCount = 1; submit_info.pCommandBuffers = &command_buffers[view];
 #ifdef MIRROR_WINDOW
 			if (view == mirrorView && !iconified)
 			{
@@ -472,7 +483,7 @@ namespace arx
 			}
 #endif // MIRROR_WINDOW
 
-			queue.submit(submitInfo, inFlights[view]);
+			queue.submit(submit_info, in_flights[view]);
 
 #ifdef MIRROR_WINDOW
 			if (view == mirrorView && !iconified)
@@ -484,7 +495,7 @@ namespace arx
 				}
 			}
 #endif
-		}*/
+		}
 
 	public: // concept: RenderingObjectManager.
 		auto create_texture(const std::string& path) -> Texture* {
@@ -552,7 +563,7 @@ namespace arx
 			destroy_buffer(staging_buffer, staging_buffer_memory);
 
 			std::array<vk::DescriptorSetLayout, 1> layouts{ descriptor_set_layouts.material_descriptor_set_layout };
-			vk::DescriptorSetAllocateInfo allo_info(descriptorPool, layouts);
+			vk::DescriptorSetAllocateInfo allo_info(descriptor_pool, layouts);
 			auto descriptor_set = device.allocateDescriptorSets(allo_info)[0];
 
 			vk::DescriptorBufferInfo property_buffer_info(property_buffer, { }, sizeof(MaterialPropertyBufferObject));
@@ -586,6 +597,8 @@ namespace arx
 				normal_map_info = { defaults.empty_texture->texture_sampler, defaults.empty_texture->texture_image_view, vk::ImageLayout::eShaderReadOnlyOptimal };
 				descriptor_writes.push_back({ descriptor_set, 2, 0, 1, vk::DescriptorType::eCombinedImageSampler, &normal_map_info });
 			}
+
+			device.updateDescriptorSets(descriptor_writes, { });
 
 			return new Material{
 				descriptor_set,
@@ -721,7 +734,7 @@ namespace arx
 
 			return new MeshModel{ vertex_count, index_count, vertex_buffer, vertex_buffer_memory, index_buffer, index_buffer_memory };
 		}
-		auto create_mesh_model(const MeshModel::Builder& builder, Material* material) -> MeshModel* {
+		auto create_mesh_model(const MeshModel::Builder& builder) -> MeshModel* {
 			auto [build_vertices, build_indices] = builder.build();
 			return create_mesh_model(build_vertices, build_indices);
 		}
@@ -956,7 +969,7 @@ namespace arx
 		*/
 	public:
 		VulkanRenderer() {
-			queueFamilyIndex = 0;
+			queue_family_index = 0;
 		}
 
 #ifdef MIRROR_WINDOW
@@ -1029,7 +1042,7 @@ namespace arx
 
 			log_step("Vulkan", "Creating Vulkan Instance");
 			// App Info.
-			vk::ApplicationInfo appInfo("Naive OpenXR Game", 1, "No Engine", 1, VK_API_VERSION_1_3);
+			vk::ApplicationInfo appInfo("Arxetipo", 1, "Arxetipo Engine", 1, VK_API_VERSION_1_3);
 
 			// Instance Info.
 #if !defined(ENABLE_VALIDATION_LAYERS)
@@ -1044,40 +1057,40 @@ namespace arx
 		}
 		auto pick_physical_device(P& proxy) -> void {
 			log_step("Vulkan", "Picking Physical Device");
-			physicalDevice = proxy.get_physical_device();
+			physical_device = proxy.get_physical_device();
 			log_success();
-			auto properties = physicalDevice.getProperties();
+			auto properties = physical_device.getProperties();
 			log_info("Vulkan", ("Physical Device Name : " + static_cast<std::string>(properties.deviceName.data())), 0);
 			log_info("Vulkan", std::format("Push Constant Limit : {}", properties.limits.maxPushConstantsSize), 0);
 			log_info("Vulkan", std::format("Max Anisotropy : {}", properties.limits.maxSamplerAnisotropy), 0);
 			max_anisotrophy = properties.limits.maxSamplerAnisotropy;
-			auto features = physicalDevice.getFeatures();
+			auto features = physical_device.getFeatures();
 		}
 		auto create_logical_device(P& proxy) -> void {
 			// Finding for a suitable Queue Family.
 			log_step("Vulkan", "Finding for a suitable Queue Family");
-			auto queueFamilyProperties = physicalDevice.getQueueFamilyProperties();
-			queueFamilyIndex = -1;
+			auto queueFamilyProperties = physical_device.getQueueFamilyProperties();
+			queue_family_index = -1;
 			for (int i = 0; i < queueFamilyProperties.size(); ++i)
 			{
 				if ((queueFamilyProperties[i].queueFlags & vk::QueueFlagBits::eGraphics)/* && physicalDevice.getSurfaceSupportKHR(i, mirrorSurface) // we'll check it later. */)
 				{
-					queueFamilyIndex = i;
+					queue_family_index = i;
 					break;
 				}
 			}
-			if (queueFamilyIndex < 0)
+			if (queue_family_index < 0)
 			{
 				throw std::runtime_error("Can't find a suitable queue family.");
 			}
 			log_success();
-			log_info("Vulkan", std::format("Queue Family Index = {}", queueFamilyIndex), 0);
+			log_info("Vulkan", std::format("Queue Family Index = {}", queue_family_index), 0);
 
 			std::vector<float> queuePiorities(1, { 0.f });
-			vk::DeviceQueueCreateInfo queueInfo({ }, queueFamilyIndex, queuePiorities);
+			vk::DeviceQueueCreateInfo queueInfo({ }, queue_family_index, queuePiorities);
 
 			// Logging Device Extensions
-			auto allExtensions = physicalDevice.enumerateDeviceExtensionProperties();
+			auto allExtensions = physical_device.enumerateDeviceExtensionProperties();
 			log_info("Vulkan", std::format("List of total {} Vulkan Device Extension(s): ", allExtensions.size()), 0);
 			for (auto& ext : allExtensions)
 			{
@@ -1111,14 +1124,14 @@ namespace arx
 
 			// Getting Queue.
 			log_step("Vulkan", "Getting Queue");
-			queue = device.getQueue(queueFamilyIndex, 0);
-			proxy.passin_queue_info(queueFamilyIndex, 0);
+			queue = device.getQueue(queue_family_index, 0);
+			proxy.passin_queue_info(queue_family_index, 0);
 			log_success();
 		}
 		auto create_command_pool() -> void {
 			log_step("Vulkan", "Creating Command Pool");
-			vk::CommandPoolCreateInfo createInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, queueFamilyIndex);
-			commandPool = device.createCommandPool(createInfo);
+			vk::CommandPoolCreateInfo createInfo(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, queue_family_index);
+			command_pool = device.createCommandPool(createInfo);
 			log_success();
 		}
 
@@ -1128,9 +1141,9 @@ namespace arx
 			vk::Format format = proxy.get_swapchain_format();
 			create_render_pass(format);
 			log_step("Vulkan", "Creating Vulkan Side Swap Chains");
-			swapChains.clear();
+			swap_chains.clear();
 			for (int i = 0; i < swap_chain_images.size(); ++i) {
-				swapChains.push_back(create_swap_chain(renderPass, swap_chain_images[i], format, rects[i]));
+				swap_chains.push_back(create_swap_chain(render_pass, swap_chain_images[i], format, rects[i]));
 			}
 			log_success();
 			log_info("Vulkan", std::format("Swapchain length : {}", swap_chain_images[0].size()), 0);
@@ -1225,16 +1238,16 @@ namespace arx
 
 		}
 		auto create_descriptors() -> void {
-			//Material::materialSetLayout = Material::getDescriptorSetLayout();
+			auto material_bindings = Material::get_descriptor_set_layout_bindings();
+			descriptor_set_layouts.material_descriptor_set_layout = device.createDescriptorSetLayout({ { }, material_bindings });
 			//CharacterBitmap::bitmapSetLayout = CharacterBitmap::getDescriptorSetLayout();
-
 			std::array<vk::DescriptorPoolSize, 2> poolSizes = {
 				vk::DescriptorPoolSize{ vk::DescriptorType::eUniformBuffer, 10 },
 				vk::DescriptorPoolSize{ vk::DescriptorType::eCombinedImageSampler, 30 },
 			};
 
 			vk::DescriptorPoolCreateInfo poolInfo(vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 100, poolSizes);	// TODO performance concern.
-			descriptorPool = device.createDescriptorPool(poolInfo);
+			descriptor_pool = device.createDescriptorPool(poolInfo);
 		}
 		auto create_graphics_pipelines() -> void {
 			log_step("Vulkan", "Loading Shader Modules");
@@ -1292,13 +1305,13 @@ namespace arx
 			auto meshVertexAttributeDescriptions = MeshModel::Vertex::get_attribute_descriptions();
 			vk::PipelineVertexInputStateCreateInfo meshVertexInputInfo{ { }, meshVertexBindingDescriptions, meshVertexAttributeDescriptions };
 
-			auto textVertexBindingDescriptions = std::vector<vk::VertexInputBindingDescription>{ };//TextModel::TextVertex::getBindingDescriptions();
-			auto textVertexAttributeDescriptions = std::vector<vk::VertexInputAttributeDescription>{ };//TextModel::TextVertex::getAttributeDescriptions();
-			vk::PipelineVertexInputStateCreateInfo textVertexInputInfo{ { }, textVertexBindingDescriptions, textVertexAttributeDescriptions };
+			//auto textVertexBindingDescriptions = std::vector<vk::VertexInputBindingDescription>{ };//TextModel::TextVertex::getBindingDescriptions();
+			//auto textVertexAttributeDescriptions = std::vector<vk::VertexInputAttributeDescription>{ };//TextModel::TextVertex::getAttributeDescriptions();
+			//vk::PipelineVertexInputStateCreateInfo textVertexInputInfo{ { }, textVertexBindingDescriptions, textVertexAttributeDescriptions };
 
-			auto uiVertexBindingDescriptions = std::vector<vk::VertexInputBindingDescription>{ };//UIElement::UIVertex::getBindingDescriptions();
-			auto uiVertexAttributeDescriptions = std::vector<vk::VertexInputAttributeDescription>{ };//UIElement::UIVertex::getAttributeDescriptions();
-			vk::PipelineVertexInputStateCreateInfo uiVertexInputInfo{ { }, uiVertexBindingDescriptions, uiVertexAttributeDescriptions };
+			//auto uiVertexBindingDescriptions = std::vector<vk::VertexInputBindingDescription>{ };//UIElement::UIVertex::getBindingDescriptions();
+			//auto uiVertexAttributeDescriptions = std::vector<vk::VertexInputAttributeDescription>{ };//UIElement::UIVertex::getAttributeDescriptions();
+			//vk::PipelineVertexInputStateCreateInfo uiVertexInputInfo{ { }, uiVertexBindingDescriptions, uiVertexAttributeDescriptions };
 
 			vk::PipelineInputAssemblyStateCreateInfo inputAssemblyInfo({}, vk::PrimitiveTopology::eTriangleList, VK_FALSE);
 
@@ -1316,9 +1329,9 @@ namespace arx
 
 			vk::PipelineColorBlendStateCreateInfo colorBlendInfo{ }; colorBlendInfo.attachmentCount = 1; colorBlendInfo.pAttachments = &colorBlendAttachment;
 
-			std::array<vk::DescriptorSetLayout, 2> setLayouts = {
+			std::array<vk::DescriptorSetLayout, 1> setLayouts = {
 				descriptor_set_layouts.material_descriptor_set_layout,
-				descriptor_set_layouts.bitmap_descriptor_set_layout,
+				//descriptor_set_layouts.bitmap_descriptor_set_layout,
 			};
 
 			std::vector<vk::PushConstantRange> pushConstantRanges = {
@@ -1327,27 +1340,27 @@ namespace arx
 
 			log_step("Vulkan", "Creating Pipeline Layout");
 			vk::PipelineLayoutCreateInfo pipelineLayoutInfo({ }, setLayouts, pushConstantRanges);
-			pipelineLayouts.worldPipelineLayout = device.createPipelineLayout(pipelineLayoutInfo);
+			pipeline_layouts.world_pipeline_layout = device.createPipelineLayout(pipelineLayoutInfo);
 			log_success();
 
 			log_step("Vulkan", "Creating Graphics Pipelines");
-			vk::GraphicsPipelineCreateInfo textPipelineCreateInfo({ }, textStageInfos, &textVertexInputInfo, &inputAssemblyInfo, { }, &viewportInfo, &fillRasterizationInfo, &multisampleInfo, &depthStencilInfo, &colorBlendInfo, &dynamicStateInfo, pipelineLayouts.worldPipelineLayout, renderPass, 0, { }, -1);
+			/*vk::GraphicsPipelineCreateInfo textPipelineCreateInfo({ }, textStageInfos, &textVertexInputInfo, &inputAssemblyInfo, { }, &viewportInfo, &fillRasterizationInfo, &multisampleInfo, &depthStencilInfo, &colorBlendInfo, &dynamicStateInfo, pipelineLayouts.worldPipelineLayout, renderPass, 0, { }, -1);
 			auto result = device.createGraphicsPipeline({ }, textPipelineCreateInfo);
 			if (result.result != vk::Result::eSuccess)
 			{
 				throw std::runtime_error("Failed to create text graphics pipeline.");
 			}
-			pipelines.textPipeline = result.value;
+			pipelines.textPipeline = result.value;*/
 
-			vk::GraphicsPipelineCreateInfo meshPipelineCreateInfo({ }, meshStageInfos, &meshVertexInputInfo, &inputAssemblyInfo, { }, &viewportInfo, &fillRasterizationInfo, &multisampleInfo, &depthStencilInfo, &colorBlendInfo, &dynamicStateInfo, pipelineLayouts.worldPipelineLayout, renderPass, 0, { }, -1);
-			result = device.createGraphicsPipeline({ }, meshPipelineCreateInfo);
+			vk::GraphicsPipelineCreateInfo meshPipelineCreateInfo({ }, meshStageInfos, &meshVertexInputInfo, &inputAssemblyInfo, { }, &viewportInfo, &fillRasterizationInfo, &multisampleInfo, &depthStencilInfo, &colorBlendInfo, &dynamicStateInfo, pipeline_layouts.world_pipeline_layout, render_pass, 0, { }, -1);
+			auto result = device.createGraphicsPipeline({ }, meshPipelineCreateInfo);
 			if (result.result != vk::Result::eSuccess)
 			{
 				throw std::runtime_error("Failed to create mesh graphics pipeline.");
 			}
-			pipelines.meshPipeline = result.value;
+			pipelines.mesh_pipeline = result.value;
 
-			vk::GraphicsPipelineCreateInfo wireframePipelineCreateInfo({ }, meshStageInfos, &meshVertexInputInfo, &inputAssemblyInfo, { }, &viewportInfo, &wireRasterizationInfo, &multisampleInfo, &depthStencilInfo, &colorBlendInfo, &dynamicStateInfo, pipelineLayouts.worldPipelineLayout, renderPass, 0, { }, -1);
+			/*vk::GraphicsPipelineCreateInfo wireframePipelineCreateInfo({ }, meshStageInfos, &meshVertexInputInfo, &inputAssemblyInfo, { }, &viewportInfo, &wireRasterizationInfo, &multisampleInfo, &depthStencilInfo, &colorBlendInfo, &dynamicStateInfo, pipelineLayouts.worldPipelineLayout, renderPass, 0, { }, -1);
 			result = device.createGraphicsPipeline({ }, wireframePipelineCreateInfo);
 			if (result.result != vk::Result::eSuccess)
 			{
@@ -1361,18 +1374,20 @@ namespace arx
 			{
 				throw std::runtime_error("Failed to create UI graphics pipeline.");
 			}
-			pipelines.uiPipeline = result.value;
+			pipelines.uiPipeline = result.value;*/
 			log_success();
 
 			device.destroyShaderModule(meshVertShaderModule);
 			device.destroyShaderModule(meshFragShaderModule);
 			device.destroyShaderModule(textVertShaderModule);
 			device.destroyShaderModule(textFragShaderModule);
+			device.destroyShaderModule(uiVertShaderModule);
+			device.destroyShaderModule(uiFragShaderModule);
 		}
 		auto allocate_command_buffers() -> void {
 			log_step("Vulkan", "Allocating Command Buffers");
-			vk::CommandBufferAllocateInfo allocateInfo(commandPool, vk::CommandBufferLevel::ePrimary, static_cast<uint32_t>(swapChains.size()));
-			commandBuffers = device.allocateCommandBuffers(allocateInfo);
+			vk::CommandBufferAllocateInfo allocateInfo(command_pool, vk::CommandBufferLevel::ePrimary, static_cast<uint32_t>(swap_chains.size()));
+			command_buffers = device.allocateCommandBuffers(allocateInfo);
 			log_success();
 
 			//preservedModels.clear();
@@ -1380,11 +1395,19 @@ namespace arx
 
 			log_step("Vulkan", "Creating synchronizers");
 			vk::FenceCreateInfo fenceInfo(vk::FenceCreateFlagBits::eSignaled);
-			inFlights.resize(swapChains.size());
-			for (int i = 0; i < swapChains.size(); ++i)
+			in_flights.resize(swap_chains.size());
+			for (int i = 0; i < swap_chains.size(); ++i)
 			{
-				inFlights[i] = device.createFence(fenceInfo);
+				in_flights[i] = device.createFence(fenceInfo);
 			}
+			log_success();
+		}
+		auto create_default_resources() -> void {
+			log_step("Vulkan", "Creating default resources");
+			unsigned char pixels[] = { 0, 0, 0, 0 };
+			defaults.empty_texture = create_texture(pixels, 1, 1, 4);
+			defaults.default_material = create_material(nullptr, nullptr, glm::vec4{ 0.4f, 0.4f, 0.4f, 1.0f });
+			defaults.sample_sphere = create_mesh_model(MeshBuilder::Icosphere(0.2f, 3));
 			log_success();
 		}
 
@@ -1405,7 +1428,7 @@ namespace arx
 
 			log_step("Vulkan", "Creating Render Pass");
 			vk::RenderPassCreateInfo createInfo({ }, attachments, subpasses, dependencies);
-			renderPass = device.createRenderPass(createInfo);
+			render_pass = device.createRenderPass(createInfo);
 			log_success();
 		}
 
@@ -1578,7 +1601,7 @@ namespace arx
 		}
 		auto find_memory_type(uint32_t type_filter, vk::MemoryPropertyFlags memory_property_flags) -> uint32_t
 		{
-			auto memory_properties = physicalDevice.getMemoryProperties();
+			auto memory_properties = physical_device.getMemoryProperties();
 			for (uint32_t i = 0; i < memory_properties.memoryTypeCount; ++i)
 			{
 				if ((type_filter & (1 << i)) && ((memory_properties.memoryTypes[i].propertyFlags & memory_property_flags) == memory_property_flags))
@@ -1690,7 +1713,7 @@ namespace arx
 		auto find_supported_format(const std::vector<vk::Format> candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) -> vk::Format {
 			for (auto format : candidates)
 			{
-				auto properties = physicalDevice.getFormatProperties(format);
+				auto properties = physical_device.getFormatProperties(format);
 				if (tiling == vk::ImageTiling::eLinear && (properties.linearTilingFeatures & features) == features)
 				{
 					return format;
@@ -1712,14 +1735,12 @@ namespace arx
 			std::vector<vk::Framebuffer> framebuffers{ };
 
 			// ImageViews.
-			for (auto& image : images)
-			{
+			for (auto& image : images) {
 				vk::ImageViewCreateInfo create_info{ { }, image, vk::ImageViewType::e2D, format, { }, { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 } };
 				image_views.push_back(device.createImageView(create_info));
 			}
 
-			if (render_pass)
-			{
+			if (render_pass) {
 				// Depth.
 				auto depth_format = find_depth_format();
 				std::array<uint32_t, 1> queue_family_indices = { 0 };
@@ -1728,15 +1749,14 @@ namespace arx
 				auto depth_image_view = create_image_view(depth_image, depth_format, 1, vk::ImageAspectFlagBits::eDepth);
 
 				// Framebuffer.
-				for (auto& view : image_views)
-				{
+				for (auto& view : image_views) {
 					std::array<vk::ImageView, 2> attachments = { view, depth_image_view };
 					vk::FramebufferCreateInfo create_info({ }, render_pass, attachments, rect.extent.width, rect.extent.height, 1);
 					framebuffers.push_back(device.createFramebuffer(create_info));
 				}
 			}
 
-			return new Swapchain{ length, images, image_views, framebuffers, depth_image, depth_image_memory, depth_image_view, format, rect };
+			return new Swapchain{ length, images, image_views, framebuffers, depth_image, depth_image_memory, depth_image_view, format, rect, render_pass };
 		}
 
 		auto calculate_tangent_bitangent(std::vector<MeshModel::Vertex>& vertices, const std::vector<uint32_t>& indices) -> void
@@ -1798,7 +1818,7 @@ namespace arx
 
 		auto begin_single_time_command_buffer() -> vk::CommandBuffer
 		{
-			vk::CommandBufferAllocateInfo allo_info(commandPool, vk::CommandBufferLevel::ePrimary, 1);
+			vk::CommandBufferAllocateInfo allo_info(command_pool, vk::CommandBufferLevel::ePrimary, 1);
 			auto command_buffer = device.allocateCommandBuffers(allo_info)[0];
 
 			vk::CommandBufferBeginInfo begin_info({ });
@@ -1816,7 +1836,7 @@ namespace arx
 			queue.submit(infos);
 			queue.waitIdle();
 
-			device.freeCommandBuffers(commandPool, command_buffers);
+			device.freeCommandBuffers(command_pool, command_buffers);
 		}
 
 		static auto readFile(const std::string& filepath) -> std::vector<uint32_t> {
@@ -1839,22 +1859,22 @@ namespace arx
 
 	private: // Owning. Responsible to destroy them. Or value types.
 		vk::Instance instance;
-		vk::PhysicalDevice physicalDevice;
+		vk::PhysicalDevice physical_device;
 		float max_anisotrophy;
 		vk::Device device;
-		uint32_t queueFamilyIndex;
+		uint32_t queue_family_index;
 		vk::Queue queue;
-		vk::RenderPass renderPass;
-		vk::DescriptorPool descriptorPool;
+		vk::RenderPass render_pass;
+		vk::DescriptorPool descriptor_pool;
 		struct {
 			vk::DescriptorSetLayout material_descriptor_set_layout;
 			vk::DescriptorSetLayout bitmap_descriptor_set_layout;
 		} descriptor_set_layouts;
 		struct {
-			vk::PipelineLayout worldPipelineLayout;
-		} pipelineLayouts;
+			vk::PipelineLayout world_pipeline_layout;
+		} pipeline_layouts;
 		struct {
-			vk::Pipeline meshPipeline;
+			vk::Pipeline mesh_pipeline;
 			vk::Pipeline textPipeline;
 			vk::Pipeline wireframePipeline;
 			vk::Pipeline uiPipeline;
@@ -1862,13 +1882,15 @@ namespace arx
 		} pipelines;
 		struct {
 			Texture* empty_texture;
+			Material* default_material;
+			MeshModel* sample_sphere;
 		} defaults;
-		vk::CommandPool commandPool;
-		std::vector<vk::CommandBuffer> commandBuffers;
+		vk::CommandPool command_pool;
+		std::vector<vk::CommandBuffer> command_buffers;
 		// std::vector<std::vector<hd::MeshModel>> preservedModels;	// models are preserved by a commandBuffer when they are being drawn.
-		vk::Semaphore drawDone;
-		std::vector<vk::Fence> inFlights;
-		std::vector<Swapchain*> swapChains;
+		vk::Semaphore draw_done;
+		std::vector<vk::Fence> in_flights;
+		std::vector<Swapchain*> swap_chains;
 
 #ifdef MIRROR_WINDOW
 		GLFWwindow* window = nullptr;

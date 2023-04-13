@@ -12,8 +12,17 @@
     ]
   },
   "ExpandedNodes": [
-    ""
+    "",
+    "\\external",
+    "\\shaders",
+    "\\src",
+    "\\src\\engine",
+    "\\src\\engine\\external",
+    "\\src\\engine\\helpers",
+    "\\src\\engine\\renderer",
+    "\\src\\engine\\renderer\\vulkan_renderer",
+    "\\src\\engine\\xr"
   ],
-  "SelectedNode": "\\external",
+  "SelectedNode": "\\CMakeLists.txt",
   "PreviewInSolutionExplorer": false
 }

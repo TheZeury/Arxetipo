@@ -86,11 +86,30 @@ namespace arx
 		using GraphicsBindingType = xr::GraphicsBindingVulkanKHR;
 		VulkanOpenXrProxy(xr::Instance instance, xr::SystemId system_id) : xr_instance{ instance }, xr_system_id{ system_id }, dispatcher{ instance } {
 		}
-
+		static auto get_renderer_specific_xr_extensions() -> std::vector<const char*> {
+			return { XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME };
+		}
 		auto get_graphics_binding() -> GraphicsBindingType {
+			// Get VulkanGraphicsRequirements.
+			xr::GraphicsRequirementsVulkanKHR requirement = xr_instance.getVulkanGraphicsRequirements2KHR(xr_system_id, dispatcher);
+			log_info("Vulkan", "Vulkan API Version Information: ", 0);
+			log_info("Vulkan",
+				std::format("Lowest supported API version = {}.{}.{} ",
+					requirement.minApiVersionSupported.major(),
+					requirement.minApiVersionSupported.minor(),
+					requirement.minApiVersionSupported.patch()
+				),
+				1);
+			log_info("Vulkan",
+				std::format("Highest verified API version = {}.{}.{} ",
+					requirement.maxApiVersionSupported.major(),
+					requirement.maxApiVersionSupported.minor(),
+					requirement.maxApiVersionSupported.patch()
+				),
+				1);
+
 			return xr::GraphicsBindingVulkanKHR(vk_instance, vk_physical_device, vk_logical_device, vk_queue_family_index, vk_queue_index);
 		}
-
 		auto passin_xr_swapchains(std::vector<xr::Swapchain>& swapchains, std::vector<xr::Rect2Di>& rects, int64_t swapchain_format) -> void {
 			assert(swapchains.size() == rects.size());
 			vk_swapchain_images.resize(swapchains.size());
@@ -109,6 +128,12 @@ namespace arx
 			}
 			vk_swapchain_format = static_cast<vk::Format>(swapchain_format);
 		}
+
+	public:
+		VulkanOpenXrProxy(VulkanOpenXrProxy const&) = delete;
+		VulkanOpenXrProxy& operator=(VulkanOpenXrProxy const&) = delete;
+		VulkanOpenXrProxy(VulkanOpenXrProxy&&) = default;
+		VulkanOpenXrProxy& operator=(VulkanOpenXrProxy&&) = default;
 
 	private:
 		VkInstance vk_instance;

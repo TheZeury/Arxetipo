@@ -27,13 +27,13 @@ namespace arx
 		}
 
 	public:
-		static auto get_descriptor_set_layout_info() -> vk::DescriptorSetLayoutCreateInfo {
+		static auto get_descriptor_set_layout_bindings() -> std::array<vk::DescriptorSetLayoutBinding, 3> {
 			vk::DescriptorSetLayoutBinding property_layout_binding(0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eFragment, { });
 			vk::DescriptorSetLayoutBinding diffuse_map_layout_binding(1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment, { });
 			vk::DescriptorSetLayoutBinding normal_map_layout_binding(2, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment, { });
 
-			std::array<vk::DescriptorSetLayoutBinding, 3> bindings = { property_layout_binding, diffuse_map_layout_binding, normal_map_layout_binding };
-			return vk::DescriptorSetLayoutCreateInfo{ { }, bindings };
+			return { property_layout_binding, diffuse_map_layout_binding, normal_map_layout_binding };
+			//return std::make_tuple(vk::DescriptorSetLayoutCreateInfo{ { }, bindings });
 		}
 
 	public:

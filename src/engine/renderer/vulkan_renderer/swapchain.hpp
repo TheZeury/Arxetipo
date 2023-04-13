@@ -19,7 +19,8 @@ namespace arx
 			vk::DeviceMemory depth_image_memory,
 			vk::ImageView depth_image_view,
 			vk::Format format,
-			vk::Rect2D rect
+			vk::Rect2D rect,
+			vk::RenderPass render_pass = nullptr
 		) : length{ length },
 			images{ images },
 			image_views{ image_views },
@@ -27,7 +28,8 @@ namespace arx
 			depth_image{ depth_image },
 			depth_image_memory{ depth_image_memory },
 			format{ format },
-			rect{ rect }
+			rect{ rect },
+			render_pass{ render_pass }
 		{
 
 		}
