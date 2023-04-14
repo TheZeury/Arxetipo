@@ -31,12 +31,23 @@ namespace arx
 						last_transform = transform;
 					}
 				}
+				if (xr_plugin != nullptr) {
+					xr_plugin->update(camera_offset_transform != nullptr ? camera_offset_transform->get_global_matrix() : glm::mat4{ 1.f });
+				}
 			}
 		}
 
 	public:
-		GraphicsSystem(VulkanRenderer* renderer) : renderer{ renderer } {
+		GraphicsSystem(VulkanRenderer* renderer, OpenXRPlugin* xr_plugin = nullptr) : renderer{ renderer }, xr_plugin{ xr_plugin } {
 			
+		}
+
+		auto set_camera_offset_transform(SpaceTransform* transform) -> void {
+			camera_offset_transform = transform;
+		}
+
+		auto get_camera_offset_transform() -> SpaceTransform* {
+			return camera_offset_transform;
 		}
 
 		auto add_mesh_model(MeshModel* model, Material* material, SpaceTransform* transform) -> void {
@@ -60,8 +71,10 @@ namespace arx
 		}
 
 		bool mobilized = false;
+		SpaceTransform* camera_offset_transform = nullptr;
 		std::multiset<std::tuple<Material*, MeshModel*, glm::mat4*>> mesh_models;
 		std::multiset<SpaceTransform*> transforms;
 		VulkanRenderer* renderer;
+		OpenXRPlugin* xr_plugin;
 	};
 }
