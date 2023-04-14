@@ -117,7 +117,7 @@ namespace arx
 			log_success();
 		
 			log_step("Vulkan", "Destroying Command Buffers");
-			device.freeCommandBuffers(command_pool, command_buffers);
+			device.freeCommandBuffers(command_pool, { command_buffer });
 			log_success();
 		
 		
@@ -144,13 +144,13 @@ namespace arx
 			device.destroyRenderPass(render_pass);
 			log_success();
 		}
-		auto render_view_xr(const glm::mat4& mat_projection, xr::Posef pose, uint32_t view, uint32_t imageIndex) -> void
+		auto render_view_xr(vk::ArrayProxy<std::tuple<glm::mat4, glm::mat4, uint32_t>> xr_camera) -> void
 		{
-			if (device.waitForFences(1, &in_flights[view], VK_TRUE, UINT64_MAX) != vk::Result::eSuccess)
+			if (device.waitForFences(1, &in_flights[0], VK_TRUE, UINT64_MAX) != vk::Result::eSuccess)	// TODO: implement FRAME_IN_FLIGHT
 			{
 				throw std::runtime_error("Failed to wait for fences.");
 			}
-			if (device.resetFences(1, &in_flights[view]) != vk::Result::eSuccess)
+			if (device.resetFences(1, &in_flights[0]) != vk::Result::eSuccess)
 			{
 				throw std::runtime_error("Failed to reset Fences.");
 			}
@@ -161,303 +161,302 @@ namespace arx
 #endif
 
 			//preservedModels[view].clear();
-
-			command_buffers[view].reset();
-
+			command_buffer.reset();
 			vk::CommandBufferBeginInfo beginInfo{ };
-			command_buffers[view].begin(beginInfo);	// <======= Command Buffer Begin.
+			command_buffer.begin(beginInfo);	// <======= Command Buffer Begin.
 
-			command_buffers[view].beginRenderPass(swap_chains[view]->get_render_pass_begin_info(imageIndex), vk::SubpassContents::eInline);		// <======= Render Pass Begin.
-
-			//const auto pose = projectionView.pose.get();
-			//XrMatrix4x4f matProjection;		// P
-			//XrMatrix4x4f_CreateProjectionFov(&matProjection, GRAPHICS_VULKAN, projectionView.fov, DEFAULT_NEAR_Z, INFINITE_FAR_Z);
-
-			//std::vector<hd::Scene> scenes;
-			bool haveText = false;
-			bool haveMesh = true;
-			bool haveUI = false;
-			bool haveDebug = false;
-
-			glm::mat4 no_camera_inv_view;
-			glm::vec3 identity{ 1.f, 1.f, 1.f };
-			XrMatrix4x4f_CreateTranslationRotationScale(&cnv<XrMatrix4x4f>(no_camera_inv_view), &(pose.get()->position), &(pose.get()->orientation), &cnv<XrVector3f>(identity));
-			glm::mat4 no_camera_view;
-			XrMatrix4x4f_InvertRigidBody(&cnv<XrMatrix4x4f>(no_camera_view), &cnv<XrMatrix4x4f>(no_camera_inv_view));
-
-			//for (auto it = this->scenes.begin(); it != this->scenes.end(); )
-			//{
-			//	auto scene = it->lock();
-			//	if (scene == nullptr)
-			//	{
-			//		it = this->scenes.erase(it);
-			//		continue;
-			//	}
-			//	++it;
-
-			//	scenes.push_back(scene);
-
-			//	haveText |= !(scene->debugMode == SceneDebugMode::eDebugOnly || scene->texts.empty());
-			//	haveMesh |= !(scene->debugMode == SceneDebugMode::eDebugOnly || scene->models.empty());
-			//	haveUI |= !(scene->uiElements.empty());	// No `scene->onlyDebug` like above because we till want to have UI even in debug view.
-			//	haveDebug |= debugOn(scene->debugMode) && !(scene->debugScene == nullptr || scene->debugScene->models.empty());
-
-			//	if (!scene->cameraTransform.expired())
-			//	{
-			//		scene->cameraTransform.lock()->setLocalPosition(*(glm::vec3*)(&(pose->position)));
-			//		scene->cameraTransform.lock()->setLocalRotation(*(glm::quat*)(&(pose->orientation)));
-			//	}
-			//}
-
-			/*if (haveText)
+			for (size_t view = 0; view < xr_camera.size(); ++view)
 			{
-				commandBuffers[view].bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.textPipeline);			// <======= Bind Text Pipeline.
+				const auto& [mat_projection, eye_pose, image_index] = xr_camera.data()[view];
 
-				commandBuffers[view].setViewport(0, 1, swapChains[view]->getViewport());		// <======== Set Viewports.
+				command_buffer.beginRenderPass(swap_chains[view]->get_render_pass_begin_info(image_index), vk::SubpassContents::eInline);		// <======= Render Pass Begin. TODO: use subpasses.
 
-				commandBuffers[view].setScissor(0, 1, swapChains[view]->getScissor());		// <======== Set Scissors.
+				//const auto pose = projectionView.pose.get();
+				//XrMatrix4x4f matProjection;		// P
+				//XrMatrix4x4f_CreateProjectionFov(&matProjection, GRAPHICS_VULKAN, projectionView.fov, DEFAULT_NEAR_Z, INFINITE_FAR_Z);
 
-				// Draw something.
-				for (auto scene : scenes)
+				bool haveText = false;
+				bool haveMesh = true;
+				bool haveUI = false;
+				bool haveDebug = false;
+
+				glm::mat4 no_offset_camera_view;
+				XrMatrix4x4f_InvertRigidBody(&cnv<XrMatrix4x4f>(no_offset_camera_view), &cnv<XrMatrix4x4f>(eye_pose));
+
+				//for (auto it = this->scenes.begin(); it != this->scenes.end(); )
+				//{
+				//	auto scene = it->lock();
+				//	if (scene == nullptr)
+				//	{
+				//		it = this->scenes.erase(it);
+				//		continue;
+				//	}
+				//	++it;
+
+				//	scenes.push_back(scene);
+
+				//	haveText |= !(scene->debugMode == SceneDebugMode::eDebugOnly || scene->texts.empty());
+				//	haveMesh |= !(scene->debugMode == SceneDebugMode::eDebugOnly || scene->models.empty());
+				//	haveUI |= !(scene->uiElements.empty());	// No `scene->onlyDebug` like above because we till want to have UI even in debug view.
+				//	haveDebug |= debugOn(scene->debugMode) && !(scene->debugScene == nullptr || scene->debugScene->models.empty());
+
+				//	if (!scene->cameraTransform.expired())
+				//	{
+				//		scene->cameraTransform.lock()->setLocalPosition(*(glm::vec3*)(&(pose->position)));
+				//		scene->cameraTransform.lock()->setLocalRotation(*(glm::quat*)(&(pose->orientation)));
+				//	}
+				//}
+
+				/*if (haveText)
 				{
-					if (scene->debugMode == SceneDebugMode::eDebugOnly || scene->texts.empty()) continue;
+					commandBuffers[view].bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.textPipeline);			// <======= Bind Text Pipeline.
 
-					XrMatrix4x4f matView;		// V
-					if (scene->cameraTransform.expired())
-					{
-						matView = noCameraView;
-					}
-					else
-					{
-						XrMatrix4x4f invView = cnv<XrMatrix4x4f>(scene->cameraTransform.lock()->getGlobalMatrix());
-						XrMatrix4x4f_InvertRigidBody(&matView, &invView);
-					}
+					commandBuffers[view].setViewport(0, 1, swapChains[view]->getViewport());		// <======== Set Viewports.
 
-					XrMatrix4x4f matProjectionView;	// PV
-					XrMatrix4x4f_Multiply(&matProjectionView, &matProjection, &matView);
-					std::vector<PushConstantData> data(1);
+					commandBuffers[view].setScissor(0, 1, swapChains[view]->getScissor());		// <======== Set Scissors.
 
-					std::pair<hd::TextModel, hd::ITransform> last = { nullptr, nullptr };
-					for (auto& pair : scene->texts)
+					// Draw something.
+					for (auto scene : scenes)
 					{
-						auto text = pair.first;
-						if (text != last.first)
+						if (scene->debugMode == SceneDebugMode::eDebugOnly || scene->texts.empty()) continue;
+
+						XrMatrix4x4f matView;		// V
+						if (scene->cameraTransform.expired())
 						{
-							text->bind(commandBuffers[view]);
-							commandBuffers[view].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayouts.worldPipelineLayout, 0, { text->material->descriptorSet }, { });
-							commandBuffers[view].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayouts.worldPipelineLayout, 1, { text->bitmap->descriptorSet }, { });
-							last.first = text;
+							matView = noCameraView;
+						}
+						else
+						{
+							XrMatrix4x4f invView = cnv<XrMatrix4x4f>(scene->cameraTransform.lock()->getGlobalMatrix());
+							XrMatrix4x4f_InvertRigidBody(&matView, &invView);
 						}
 
-						auto transform = pair.second;
-						if (transform != last.second)
+						XrMatrix4x4f matProjectionView;	// PV
+						XrMatrix4x4f_Multiply(&matProjectionView, &matProjection, &matView);
+						std::vector<PushConstantData> data(1);
+
+						std::pair<hd::TextModel, hd::ITransform> last = { nullptr, nullptr };
+						for (auto& pair : scene->texts)
 						{
-							auto matTransform = pair.second->getGlobalMatrix();	// M
-							data[0].modelMatrix = matTransform;
-							XrMatrix4x4f_Multiply(&(data[0].projectionView), &matProjectionView, (XrMatrix4x4f*)&matTransform);	// PVM
-							commandBuffers[view].pushConstants<PushConstantData>(pipelineLayouts.worldPipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, data);
+							auto text = pair.first;
+							if (text != last.first)
+							{
+								text->bind(commandBuffers[view]);
+								commandBuffers[view].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayouts.worldPipelineLayout, 0, { text->material->descriptorSet }, { });
+								commandBuffers[view].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayouts.worldPipelineLayout, 1, { text->bitmap->descriptorSet }, { });
+								last.first = text;
+							}
+
+							auto transform = pair.second;
+							if (transform != last.second)
+							{
+								auto matTransform = pair.second->getGlobalMatrix();	// M
+								data[0].modelMatrix = matTransform;
+								XrMatrix4x4f_Multiply(&(data[0].projectionView), &matProjectionView, (XrMatrix4x4f*)&matTransform);	// PVM
+								commandBuffers[view].pushConstants<PushConstantData>(pipelineLayouts.worldPipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, data);
+							}
+
+							text->draw(commandBuffers[view]);
 						}
-
-						text->draw(commandBuffers[view]);
 					}
-				}
-				// End Draw.
-			}*/
-
-			if (haveMesh)
-			{
-				command_buffers[view].bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.mesh_pipeline);			// <======= Bind Mesh Pipeline.
-
-				command_buffers[view].setViewport(0, 1, swap_chains[view]->getViewport());		// <======== Set Viewports.
-
-				command_buffers[view].setScissor(0, 1, swap_chains[view]->getScissor());		// <======== Set Scissors.
-
-				// Draw something.
-				/*for (auto scene : scenes)
-				{
-					if (scene->debugMode == SceneDebugMode::eDebugOnly || scene->models.empty()) continue;
-
-					XrMatrix4x4f matView;		// V
-					if (scene->cameraTransform.expired())
-					{
-						matView = noCameraView;
-					}
-					else
-					{
-						XrMatrix4x4f invView = cnv<XrMatrix4x4f>(scene->cameraTransform.lock()->getGlobalMatrix());
-						XrMatrix4x4f_InvertRigidBody(&matView, &invView);
-					}
-
-					XrMatrix4x4f matProjectionView;	// PV
-					XrMatrix4x4f_Multiply(&matProjectionView, &matProjection, &matView);
-					std::vector<PushConstantData> data(1);
-
-					std::pair<hd::MeshModel, hd::ITransform> last = { nullptr, nullptr };
-					for (auto& pair : scene->models)
-					{
-						auto model = pair.first;
-						if (model != last.first)
-						{
-							model->bind(commandBuffers[view]);
-							commandBuffers[view].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayouts.worldPipelineLayout, 0, { model->material->descriptorSet }, { });
-							last.first = model;
-						}
-
-						auto transform = pair.second;
-						if (transform != last.second)
-						{
-							auto matTransform = pair.second->getGlobalMatrix();	// M
-							data[0].modelMatrix = matTransform;
-							XrMatrix4x4f_Multiply(&(data[0].projectionView), &matProjectionView, (XrMatrix4x4f*)&matTransform);	// PVM
-							commandBuffers[view].pushConstants<PushConstantData>(pipelineLayouts.worldPipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, data);
-						}
-
-						model->draw(commandBuffers[view]);
-					}
-
+					// End Draw.
 				}*/
-				struct { Material* material; MeshModel* mesh_model; SpaceTransform* transform; } last = { nullptr, nullptr, nullptr };
-				for (auto& models : mesh_models)
+
+				if (haveMesh)
 				{
-					
-					for (auto [material, mesh_model, transform] : *models)
+					command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.mesh_pipeline);			// <======= Bind Mesh Pipeline.
+
+					command_buffer.setViewport(0, 1, swap_chains[view]->getViewport());		// <======== Set Viewports.
+
+					command_buffer.setScissor(0, 1, swap_chains[view]->getScissor());		// <======== Set Scissors.
+
+					// Draw something.
+					/*for (auto scene : scenes)
 					{
-						if (material != last.material) {
-							last.material = material;
-							command_buffers[view].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline_layouts.world_pipeline_layout, 0, { material->descriptor_set }, { });
+						if (scene->debugMode == SceneDebugMode::eDebugOnly || scene->models.empty()) continue;
+
+						XrMatrix4x4f matView;		// V
+						if (scene->cameraTransform.expired())
+						{
+							matView = noCameraView;
 						}
-						if (mesh_model != last.mesh_model) {
-							last.mesh_model = mesh_model;
-							command_buffers[view].bindVertexBuffers(0, { mesh_model->vertex_buffer }, { vk::DeviceSize(0) });
-							command_buffers[view].bindIndexBuffer(mesh_model->index_buffer, 0, vk::IndexType::eUint32);
+						else
+						{
+							XrMatrix4x4f invView = cnv<XrMatrix4x4f>(scene->cameraTransform.lock()->getGlobalMatrix());
+							XrMatrix4x4f_InvertRigidBody(&matView, &invView);
 						}
-						if (transform != last.transform) {
-							last.transform = transform;
-							glm::mat4 model_matrix = transform->get_global_matrix();
-							std::array<PushConstantData, 1> data;
-							data[0].modelMatrix = model_matrix;
-							data[0].projectionView = mat_projection * no_camera_view * model_matrix;
-							command_buffers[view].pushConstants<PushConstantData>(pipeline_layouts.world_pipeline_layout, vk::ShaderStageFlagBits::eVertex, 0, data);
+
+						XrMatrix4x4f matProjectionView;	// PV
+						XrMatrix4x4f_Multiply(&matProjectionView, &matProjection, &matView);
+						std::vector<PushConstantData> data(1);
+
+						std::pair<hd::MeshModel, hd::ITransform> last = { nullptr, nullptr };
+						for (auto& pair : scene->models)
+						{
+							auto model = pair.first;
+							if (model != last.first)
+							{
+								model->bind(commandBuffers[view]);
+								commandBuffers[view].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayouts.worldPipelineLayout, 0, { model->material->descriptorSet }, { });
+								last.first = model;
+							}
+
+							auto transform = pair.second;
+							if (transform != last.second)
+							{
+								auto matTransform = pair.second->getGlobalMatrix();	// M
+								data[0].modelMatrix = matTransform;
+								XrMatrix4x4f_Multiply(&(data[0].projectionView), &matProjectionView, (XrMatrix4x4f*)&matTransform);	// PVM
+								commandBuffers[view].pushConstants<PushConstantData>(pipelineLayouts.worldPipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, data);
+							}
+
+							model->draw(commandBuffers[view]);
 						}
-						command_buffers[view].drawIndexed(mesh_model->index_count, 1, 0, 0, 0);
+
+					}*/
+					struct { Material* material; MeshModel* mesh_model; SpaceTransform* transform; } last = { nullptr, nullptr, nullptr };
+					for (auto& models : mesh_models)
+					{
+
+						for (auto [material, mesh_model, transform] : *models)
+						{
+							if (material != last.material) {
+								last.material = material;
+								command_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline_layouts.world_pipeline_layout, 0, { material->descriptor_set }, { });
+							}
+							if (mesh_model != last.mesh_model) {
+								last.mesh_model = mesh_model;
+								command_buffer.bindVertexBuffers(0, { mesh_model->vertex_buffer }, { vk::DeviceSize(0) });
+								command_buffer.bindIndexBuffer(mesh_model->index_buffer, 0, vk::IndexType::eUint32);
+							}
+							if (transform != last.transform) {
+								last.transform = transform;
+								glm::mat4 model_matrix = transform->get_global_matrix();
+								std::array<PushConstantData, 1> data;
+								data[0].modelMatrix = model_matrix;
+								data[0].projectionView = mat_projection * no_offset_camera_view * model_matrix;
+								command_buffer.pushConstants<PushConstantData>(pipeline_layouts.world_pipeline_layout, vk::ShaderStageFlagBits::eVertex, 0, data);
+							}
+							command_buffer.drawIndexed(mesh_model->index_count, 1, 0, 0, 0);
+						}
 					}
+
+
+					// End Draw.
 				}
-				
-				
-				// End Draw.
+
+				/*if (haveUI)
+				{
+					commandBuffers[view].bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.uiPipeline);			// <======= Bind UI Pipeline.
+
+					commandBuffers[view].setViewport(0, 1, swapChains[view]->getViewport());		// <======== Set Viewports.
+
+					commandBuffers[view].setScissor(0, 1, swapChains[view]->getScissor());		// <======== Set Scissors.
+
+					// Draw something.
+					for (auto scene : scenes)
+					{
+						if (scene->uiElements.empty()) continue;	// No `scene->onlyDebug` like above because we till want to have UI even in debug view.
+
+						XrMatrix4x4f matView;		// V
+						if (scene->cameraTransform.expired())
+						{
+							matView = noCameraView;
+						}
+						else
+						{
+							XrMatrix4x4f invView = cnv<XrMatrix4x4f>(scene->cameraTransform.lock()->getGlobalMatrix());
+							XrMatrix4x4f_InvertRigidBody(&matView, &invView);
+						}
+
+						XrMatrix4x4f matProjectionView;	// PV
+						XrMatrix4x4f_Multiply(&matProjectionView, &matProjection, &matView);
+						std::vector<PushConstantData> data(1);
+
+						std::pair<hd::UIElement, hd::ITransform> last = { nullptr, nullptr };
+						for (auto& pair : scene->uiElements)
+						{
+							auto element = pair.first;
+							if (element != last.first)
+							{
+								element->bind(commandBuffers[view]);
+								commandBuffers[view].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayouts.worldPipelineLayout, 1, { element->bitmap->descriptorSet }, { });
+								last.first = element;
+							}
+
+							auto transform = pair.second;
+							if (transform != last.second)
+							{
+								auto matTransform = pair.second->getGlobalMatrix();	// M
+								data[0].modelMatrix = matTransform;
+								XrMatrix4x4f_Multiply(&(data[0].projectionView), &matProjectionView, (XrMatrix4x4f*)&matTransform);	// PVM
+								commandBuffers[view].pushConstants<PushConstantData>(pipelineLayouts.worldPipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, data);
+							}
+
+							element->draw(commandBuffers[view]);
+						}
+					}
+					// End Draw.
+				}*/
+
+				/*if (haveDebug)
+				{
+					commandBuffers[view].bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.wireframePipeline);			// <======= Bind Wireframe Pipeline.
+
+					commandBuffers[view].setViewport(0, 1, swapChains[view]->getViewport());		// <======== Set Viewports.
+
+					commandBuffers[view].setScissor(0, 1, swapChains[view]->getScissor());		// <======== Set Scissors.
+
+					// Draw something.
+					for (auto scene : scenes)
+					{
+						if (!debugOn(scene->debugMode)) continue;
+						scene = scene->debugScene;
+						if (scene == nullptr || scene->models.empty()) continue;
+
+						XrMatrix4x4f matView;		// V
+						if (scene->cameraTransform.expired())
+						{
+							matView = noCameraView;
+						}
+						else
+						{
+							XrMatrix4x4f invView = cnv<XrMatrix4x4f>(scene->cameraTransform.lock()->getGlobalMatrix());
+							XrMatrix4x4f_InvertRigidBody(&matView, &invView);
+						}
+
+						XrMatrix4x4f matProjectionView;	// PV
+						XrMatrix4x4f_Multiply(&matProjectionView, &matProjection, &matView);
+						std::vector<PushConstantData> data(1);
+
+						std::pair<hd::MeshModel, hd::ITransform> last = { nullptr, nullptr };
+						for (auto& pair : scene->models)
+						{
+							auto model = pair.first;
+							if (model != last.first)
+							{
+								model->bind(commandBuffers[view]);
+								commandBuffers[view].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayouts.worldPipelineLayout, 0, { model->material->descriptorSet }, { });
+								last.first = model;
+							}
+
+							auto transform = pair.second;
+							if (transform != last.second)
+							{
+								auto matTransform = pair.second->getGlobalMatrix();	// M
+								data[0].modelMatrix = matTransform;
+								XrMatrix4x4f_Multiply(&(data[0].projectionView), &matProjectionView, (XrMatrix4x4f*)&matTransform);	// PVM
+								commandBuffers[view].pushConstants<PushConstantData>(pipelineLayouts.worldPipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, data);
+							}
+
+							model->draw(commandBuffers[view]);
+						}
+					}
+					// End Draw.
+				}*/;
+
+				command_buffer.endRenderPass();		// <========= Render Pass End.
 			}
-
-			/*if (haveUI)
-			{
-				commandBuffers[view].bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.uiPipeline);			// <======= Bind UI Pipeline.
-
-				commandBuffers[view].setViewport(0, 1, swapChains[view]->getViewport());		// <======== Set Viewports.
-
-				commandBuffers[view].setScissor(0, 1, swapChains[view]->getScissor());		// <======== Set Scissors.
-
-				// Draw something.
-				for (auto scene : scenes)
-				{
-					if (scene->uiElements.empty()) continue;	// No `scene->onlyDebug` like above because we till want to have UI even in debug view.
-
-					XrMatrix4x4f matView;		// V
-					if (scene->cameraTransform.expired())
-					{
-						matView = noCameraView;
-					}
-					else
-					{
-						XrMatrix4x4f invView = cnv<XrMatrix4x4f>(scene->cameraTransform.lock()->getGlobalMatrix());
-						XrMatrix4x4f_InvertRigidBody(&matView, &invView);
-					}
-
-					XrMatrix4x4f matProjectionView;	// PV
-					XrMatrix4x4f_Multiply(&matProjectionView, &matProjection, &matView);
-					std::vector<PushConstantData> data(1);
-
-					std::pair<hd::UIElement, hd::ITransform> last = { nullptr, nullptr };
-					for (auto& pair : scene->uiElements)
-					{
-						auto element = pair.first;
-						if (element != last.first)
-						{
-							element->bind(commandBuffers[view]);
-							commandBuffers[view].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayouts.worldPipelineLayout, 1, { element->bitmap->descriptorSet }, { });
-							last.first = element;
-						}
-
-						auto transform = pair.second;
-						if (transform != last.second)
-						{
-							auto matTransform = pair.second->getGlobalMatrix();	// M
-							data[0].modelMatrix = matTransform;
-							XrMatrix4x4f_Multiply(&(data[0].projectionView), &matProjectionView, (XrMatrix4x4f*)&matTransform);	// PVM
-							commandBuffers[view].pushConstants<PushConstantData>(pipelineLayouts.worldPipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, data);
-						}
-
-						element->draw(commandBuffers[view]);
-					}
-				}
-				// End Draw.
-			}*/
-
-			/*if (haveDebug)
-			{
-				commandBuffers[view].bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.wireframePipeline);			// <======= Bind Wireframe Pipeline.
-
-				commandBuffers[view].setViewport(0, 1, swapChains[view]->getViewport());		// <======== Set Viewports.
-
-				commandBuffers[view].setScissor(0, 1, swapChains[view]->getScissor());		// <======== Set Scissors.
-
-				// Draw something.
-				for (auto scene : scenes)
-				{
-					if (!debugOn(scene->debugMode)) continue;
-					scene = scene->debugScene;
-					if (scene == nullptr || scene->models.empty()) continue;
-
-					XrMatrix4x4f matView;		// V
-					if (scene->cameraTransform.expired())
-					{
-						matView = noCameraView;
-					}
-					else
-					{
-						XrMatrix4x4f invView = cnv<XrMatrix4x4f>(scene->cameraTransform.lock()->getGlobalMatrix());
-						XrMatrix4x4f_InvertRigidBody(&matView, &invView);
-					}
-
-					XrMatrix4x4f matProjectionView;	// PV
-					XrMatrix4x4f_Multiply(&matProjectionView, &matProjection, &matView);
-					std::vector<PushConstantData> data(1);
-
-					std::pair<hd::MeshModel, hd::ITransform> last = { nullptr, nullptr };
-					for (auto& pair : scene->models)
-					{
-						auto model = pair.first;
-						if (model != last.first)
-						{
-							model->bind(commandBuffers[view]);
-							commandBuffers[view].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayouts.worldPipelineLayout, 0, { model->material->descriptorSet }, { });
-							last.first = model;
-						}
-
-						auto transform = pair.second;
-						if (transform != last.second)
-						{
-							auto matTransform = pair.second->getGlobalMatrix();	// M
-							data[0].modelMatrix = matTransform;
-							XrMatrix4x4f_Multiply(&(data[0].projectionView), &matProjectionView, (XrMatrix4x4f*)&matTransform);	// PVM
-							commandBuffers[view].pushConstants<PushConstantData>(pipelineLayouts.worldPipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, data);
-						}
-
-						model->draw(commandBuffers[view]);
-					}
-				}
-				// End Draw.
-			}*/;
-
-			command_buffers[view].endRenderPass();		// <========= Render Pass End.
 
 #ifdef MIRROR_WINDOW
 			if (view == mirrorView && !iconified)
@@ -493,9 +492,9 @@ namespace arx
 			}
 #endif // MIRROR_WINDOW
 
-			command_buffers[view].end();		// <========= Command Buffer End.
+			command_buffer.end();		// <========= Command Buffer End.
 
-			vk::SubmitInfo submit_info{ }; submit_info.commandBufferCount = 1; submit_info.pCommandBuffers = &command_buffers[view];
+			vk::SubmitInfo submit_info{ }; submit_info.commandBufferCount = 1; submit_info.pCommandBuffers = &command_buffer;
 #ifdef MIRROR_WINDOW
 			if (view == mirrorView && !iconified)
 			{
@@ -504,7 +503,7 @@ namespace arx
 			}
 #endif // MIRROR_WINDOW
 
-			queue.submit(submit_info, in_flights[view]);
+			queue.submit(submit_info, in_flights[0]);
 
 #ifdef MIRROR_WINDOW
 			if (view == mirrorView && !iconified)
@@ -1407,8 +1406,8 @@ namespace arx
 		}
 		auto allocate_command_buffers() -> void {
 			log_step("Vulkan", "Allocating Command Buffers");
-			vk::CommandBufferAllocateInfo allocateInfo(command_pool, vk::CommandBufferLevel::ePrimary, static_cast<uint32_t>(swap_chains.size()));
-			command_buffers = device.allocateCommandBuffers(allocateInfo);
+			vk::CommandBufferAllocateInfo allocateInfo(command_pool, vk::CommandBufferLevel::ePrimary, 1ui32/*static_cast<uint32_t>(swap_chains.size())*/);
+			command_buffer = device.allocateCommandBuffers(allocateInfo)[0];
 			log_success();
 
 			//preservedModels.clear();
@@ -1908,7 +1907,7 @@ namespace arx
 			vk::Pipeline shadowPipeline;
 		} pipelines;
 		vk::CommandPool command_pool;
-		std::vector<vk::CommandBuffer> command_buffers;
+		vk::CommandBuffer command_buffer;
 		// std::vector<std::vector<hd::MeshModel>> preservedModels;	// models are preserved by a commandBuffer when they are being drawn.
 		vk::Semaphore draw_done;
 		std::vector<vk::Fence> in_flights;

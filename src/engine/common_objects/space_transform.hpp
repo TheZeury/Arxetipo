@@ -11,11 +11,11 @@
 
 namespace arx
 {
-	auto get_position(const glm::mat4& matrix) -> glm::vec3 {
+	inline auto get_position(const glm::mat4& matrix) -> glm::vec3 {
 		return glm::vec3(matrix[3]);
 	}
 
-	auto get_scale(const glm::mat4& matrix) -> glm::vec3 {
+	inline auto get_scale(const glm::mat4& matrix) -> glm::vec3 {
 		glm::mat3 mat3x3{ matrix };
 		glm::vec3 unflipped = glm::vec3(glm::length(mat3x3[0]), glm::length(mat3x3[1]), glm::length(mat3x3[2]));
 		float det = glm::determinant(mat3x3);
@@ -23,7 +23,7 @@ namespace arx
 		return scale;
 	}
 
-	auto get_rotation(const glm::mat4& matrix) -> glm::quat {
+	inline auto get_rotation(const glm::mat4& matrix) -> glm::quat {
 		glm::mat3 mat3x3{ matrix };
 		mat3x3 = { glm::normalize(mat3x3[0]), glm::normalize(mat3x3[1]), glm::normalize(mat3x3[2]) };
 		float det = glm::determinant(mat3x3);

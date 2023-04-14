@@ -182,20 +182,31 @@ namespace arx
 				if ((viewState.viewStateFlags & xr::ViewStateFlagBits::PositionValid) && (viewState.viewStateFlags & xr::ViewStateFlagBits::OrientationValid))
 				{
 					projectionLayerViews.resize(views.size());
+					std::vector<std::tuple<glm::mat4, glm::mat4, uint32_t>> xr_camera(views.size());
 					for (uint32_t i = 0; i < views.size(); ++i)
 					{
-						auto swapChain = swapChains[i];
-						auto imageIndex = swapChain.acquireSwapchainImage({ });
-						swapChain.waitSwapchainImage({ xr::Duration::infinite() });
+						auto& [mat_projection, eye_pose, image_index] = xr_camera[i];
 
-						projectionLayerViews[i] = xr::CompositionLayerProjectionView{ views[i].pose, views[i].fov, { swapChain, swapChainRects[i], 0 } };
+						image_index = swapChains[i].acquireSwapchainImage({});
+						swapChains[i].waitSwapchainImage({xr::Duration::infinite()});
 
-						glm::mat4 mat_projection;		// P
+						projectionLayerViews[i] = xr::CompositionLayerProjectionView{ views[i].pose, views[i].fov, { swapChains[i], swapChainRects[i], 0}};
+
 						XrMatrix4x4f_CreateProjectionFov(&cnv<XrMatrix4x4f>(mat_projection), GRAPHICS_VULKAN, views[i].fov, DEFAULT_NEAR_Z, INFINITE_FAR_Z);
+						glm::vec3 identity{ 1.f, 1.f, 1.f };
+						XrMatrix4x4f_CreateTranslationRotationScale(
+							&cnv<XrMatrix4x4f>(eye_pose), 
+							&(projectionLayerViews[i].pose.get()->position), 
+							&(projectionLayerViews[i].pose.get()->orientation), 
+							&cnv<XrVector3f>(identity)
+						);
+					}
 
-						graphics.render_view_xr(mat_projection, projectionLayerViews[i].pose, i, imageIndex); // Renderer.
-
-						swapChain.releaseSwapchainImage({ });
+					graphics.render_view_xr(xr_camera); // Renderer.
+					
+					for (uint32_t i = 0; i < views.size(); ++i)
+					{
+						swapChains[i].releaseSwapchainImage({ });
 					}
 
 					layer.space = appSpace;
