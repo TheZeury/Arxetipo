@@ -28,17 +28,20 @@ int main() {
 		graphics_system.mobilize();
 
 		auto start_time = std::chrono::high_resolution_clock::now();
+		auto last_time = start_time;
 		
 		while (xr_plugin.poll_events()) {
 			xr_plugin.poll_actions();
 
 			auto currentTime = std::chrono::high_resolution_clock::now();
-			float time_delta = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - start_time).count();
-			
-			//origin.set_local_matrix(glm::rotate(glm::mat4{ 1.0f }, time_delta * glm::pi<float>() / 4.f, glm::vec3{0.0f, 1.0f, 0.0f}));
-			origin.set_local_rotation(glm::angleAxis(time_delta * glm::pi<float>() / 4.f, glm::vec3{ 0.0f, 1.0f, 0.0f }));
+			float time_elapsed = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - start_time).count();
+			float delta_time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - last_time).count();
+			last_time = currentTime;
 
-			xr_plugin.update();
+			origin.set_local_rotation(glm::angleAxis(time_elapsed * glm::pi<float>() / 4.f, glm::vec3{ 0.0f, 1.0f, 0.0f }));
+
+			graphics_system.update();
+			xr_plugin.update(glm::translate(glm::mat4{ 1.f }, { 0.f, -1.f, 1.f }));
 		}
 	}
 	catch (const std::exception& e) {

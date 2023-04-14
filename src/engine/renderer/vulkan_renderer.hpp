@@ -11,11 +11,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/hash.hpp>
 #include <stb_image.h>
-#include <OpenXR-SDK/src/common/xr_linear.h>
 #include "../helpers/arx_logger.hpp"
 #include "../helpers/arx_math.hpp"
 #include "../proxy/renderer_proxy.hpp"
-#include "../common_objects/common_objects.hpp"
 
 #include "vulkan_renderer/swapchain.hpp"
 #include "vulkan_renderer/texture.hpp"
@@ -167,21 +165,16 @@ namespace arx
 
 			for (size_t view = 0; view < xr_camera.size(); ++view)
 			{
-				const auto& [mat_projection, eye_pose, image_index] = xr_camera.data()[view];
+				const auto& [mat_projection, mat_camera_transform, image_index] = xr_camera.data()[view];
 
 				command_buffer.beginRenderPass(swap_chains[view]->get_render_pass_begin_info(image_index), vk::SubpassContents::eInline);		// <======= Render Pass Begin. TODO: use subpasses.
 
-				//const auto pose = projectionView.pose.get();
-				//XrMatrix4x4f matProjection;		// P
-				//XrMatrix4x4f_CreateProjectionFov(&matProjection, GRAPHICS_VULKAN, projectionView.fov, DEFAULT_NEAR_Z, INFINITE_FAR_Z);
-
 				bool haveText = false;
-				bool haveMesh = true;
+				bool haveMesh = !mesh_models.empty();
 				bool haveUI = false;
 				bool haveDebug = false;
 
-				glm::mat4 no_offset_camera_view;
-				XrMatrix4x4f_InvertRigidBody(&cnv<XrMatrix4x4f>(no_offset_camera_view), &cnv<XrMatrix4x4f>(eye_pose));
+				glm::mat4 mat_camera_view = glm::inverse(mat_camera_transform);
 
 				//for (auto it = this->scenes.begin(); it != this->scenes.end(); )
 				//{
@@ -314,11 +307,11 @@ namespace arx
 						}
 
 					}*/
-					struct { Material* material; MeshModel* mesh_model; SpaceTransform* transform; } last = { nullptr, nullptr, nullptr };
+					struct { Material* material; MeshModel* mesh_model; glm::mat4* model_transform; } last = { nullptr, nullptr, nullptr };
 					for (auto& models : mesh_models)
 					{
 
-						for (auto [material, mesh_model, transform] : *models)
+						for (auto [material, mesh_model, model_transform] : *models)
 						{
 							if (material != last.material) {
 								last.material = material;
@@ -329,12 +322,11 @@ namespace arx
 								command_buffer.bindVertexBuffers(0, { mesh_model->vertex_buffer }, { vk::DeviceSize(0) });
 								command_buffer.bindIndexBuffer(mesh_model->index_buffer, 0, vk::IndexType::eUint32);
 							}
-							if (transform != last.transform) {
-								last.transform = transform;
-								glm::mat4 model_matrix = transform->get_global_matrix();
+							if (model_transform != last.model_transform) {
+								last.model_transform = model_transform;
 								std::array<PushConstantData, 1> data;
-								data[0].modelMatrix = model_matrix;
-								data[0].projectionView = mat_projection * no_offset_camera_view * model_matrix;
+								data[0].modelMatrix = *model_transform;
+								data[0].projectionView = mat_projection * mat_camera_view * (*model_transform);
 								command_buffer.pushConstants<PushConstantData>(pipeline_layouts.world_pipeline_layout, vk::ShaderStageFlagBits::eVertex, 0, data);
 							}
 							command_buffer.drawIndexed(mesh_model->index_count, 1, 0, 0, 0);
@@ -1924,6 +1916,6 @@ namespace arx
 #endif
 
 	public: // Not Owning. Don't try to destroy them.
-		std::unordered_set<std::multiset<std::tuple<Material*, MeshModel*, SpaceTransform*>>*> mesh_models;	// What a crazy type :D
+		std::unordered_set<std::multiset<std::tuple<Material*, MeshModel*, glm::mat4*>>*> mesh_models;	// What a crazy type :D
 	};
 }

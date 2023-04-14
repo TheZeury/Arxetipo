@@ -161,7 +161,7 @@ namespace arx
 				inputState.thumbstickYStates[hand] = thumbstickYState;
 			}
 		}
-		auto update() -> void {
+		auto update(const glm::mat4& camera_offset = glm::mat4{ 1.f }) -> void {
 			auto frameState = session.waitFrame({ });
 			session.beginFrame({ });
 
@@ -185,7 +185,7 @@ namespace arx
 					std::vector<std::tuple<glm::mat4, glm::mat4, uint32_t>> xr_camera(views.size());
 					for (uint32_t i = 0; i < views.size(); ++i)
 					{
-						auto& [mat_projection, eye_pose, image_index] = xr_camera[i];
+						auto& [mat_projection, mat_camera_transform, image_index] = xr_camera[i];
 
 						image_index = swapChains[i].acquireSwapchainImage({});
 						swapChains[i].waitSwapchainImage({xr::Duration::infinite()});
@@ -193,6 +193,7 @@ namespace arx
 						projectionLayerViews[i] = xr::CompositionLayerProjectionView{ views[i].pose, views[i].fov, { swapChains[i], swapChainRects[i], 0}};
 
 						XrMatrix4x4f_CreateProjectionFov(&cnv<XrMatrix4x4f>(mat_projection), GRAPHICS_VULKAN, views[i].fov, DEFAULT_NEAR_Z, INFINITE_FAR_Z);
+						glm::mat4 eye_pose;
 						glm::vec3 identity{ 1.f, 1.f, 1.f };
 						XrMatrix4x4f_CreateTranslationRotationScale(
 							&cnv<XrMatrix4x4f>(eye_pose), 
@@ -200,6 +201,7 @@ namespace arx
 							&(projectionLayerViews[i].pose.get()->orientation), 
 							&cnv<XrVector3f>(identity)
 						);
+						mat_camera_transform = camera_offset * eye_pose;
 					}
 
 					graphics.render_view_xr(xr_camera); // Renderer.

@@ -11,13 +11,27 @@ namespace arx
 			return this;
 		}
 		auto mobilize() -> void {
-			renderer->mesh_models.insert(&mesh_models);
+			if (!mobilized) {
+				renderer->mesh_models.insert(&mesh_models);
+				mobilized = true;
+			}
 		}
 		auto freeze() -> void {
-			renderer->mesh_models.erase(&mesh_models);
+			if (mobilized) {
+				renderer->mesh_models.erase(&mesh_models);
+				mobilized = false;
+			}
 		}
 		auto update() -> void {
-			// Do nothing.
+			if (mobilized) {
+				SpaceTransform* last_transform = nullptr;
+				for (auto transform : transforms) {
+					if (transform != last_transform) {
+						transform->update_matrix();
+						last_transform = transform;
+					}
+				}
+			}
 		}
 
 	public:
@@ -26,20 +40,28 @@ namespace arx
 		}
 
 		auto add_mesh_model(MeshModel* model, Material* material, SpaceTransform* transform) -> void {
-			mesh_models.insert({ material, model, transform });
+			mesh_models.insert({ material, model, &(transform->global_matrix) });
+			transforms.insert(transform);
 		}
 		auto remove_mesh_model(MeshModel* model, Material* material, SpaceTransform* transform) -> void {
 #if defined(NDEBUG)
-			mesh_models.erase(mesh_models.find({ material, model, transform }));
+			mesh_models.erase(mesh_models.find({ material, model, &(transform->global_matrix) }));
+			transforms.erase(transforms.find(transform));
 #else
-			auto itr = models.find({ material, model });
-			if (itr != models.end()) {
-				models.erase(itr);
+			auto itr_m = models.find({ material, model, &(transform->global_matrix) });
+			if (itr_m != models.end()) {
+				models.erase(itr_m);
+			}
+			auto itr_t = transforms.find(transform);
+			if (itr_t != transforms.end()) {
+				transforms.erase(itr_t);
 			}
 #endif
 		}
 
-		std::multiset<std::tuple<Material*, MeshModel*, SpaceTransform*>> mesh_models;
+		bool mobilized = false;
+		std::multiset<std::tuple<Material*, MeshModel*, glm::mat4*>> mesh_models;
+		std::multiset<SpaceTransform*> transforms;
 		VulkanRenderer* renderer;
 	};
 }
