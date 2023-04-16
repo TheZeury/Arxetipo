@@ -18,11 +18,11 @@ namespace arx
 					output << argument.to_string() << std::endl;
 				}
 				result = CommandValue{ CommandValue::Type::Empty, std::monostate{} };
-			});
+			}, true);
 			kernel.add_method("exit", [&](const std::vector<CommandValue>& arguments, CommandValue& result) {
 				exit = true;
 				result = CommandValue{ CommandValue::Type::Empty, std::monostate{} };
-			});
+			}, true);
 		}
 
 		auto run() -> void {

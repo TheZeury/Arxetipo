@@ -85,19 +85,29 @@ namespace arx
 	struct CommandKernel
 	{
 		std::vector<std::unordered_map<std::string, CommandValue>> scope_stack{ 1 };
+		std::unordered_set<std::string> scope_wide_protected;
 
-		auto add_method(const std::string& name, const std::function<void(const std::vector<CommandValue>&, CommandValue&)>& method) -> CommandKernel& {
+		auto add_method(const std::string& name, const std::function<void(const std::vector<CommandValue>&, CommandValue&)>& method, bool protect = false) -> CommandKernel& {
 			scope_stack.rbegin()->insert({ name, CommandValue{ CommandValue::Type::Method, method } });
+			if (protect) {
+				scope_wide_protected.insert(name);
+			}
 			return *this;
 		}
 
-		auto add_number(const std::string& name, float value) -> CommandKernel& {
+		auto add_number(const std::string& name, float value, bool protect = false) -> CommandKernel& {
 			scope_stack.rbegin()->insert({ name, CommandValue{ CommandValue::Type::Number, value } });
+			if (protect) {
+				scope_wide_protected.insert(name);
+			}
 			return *this;
 		}
 
-		auto add_empty(const std::string& name) -> CommandKernel& {
+		auto add_empty(const std::string& name, bool protect = false) -> CommandKernel& {
 			scope_stack.rbegin()->insert({ name, CommandValue{ CommandValue::Type::Empty, std::monostate{ } } });
+			if (protect) {
+				scope_wide_protected.insert(name); 
+			}
 			return *this;
 		}
 
@@ -197,6 +207,9 @@ namespace arx
 		}
 
 		auto excute_assignment(const CommandASTAssignmentNode& assignment) -> void {
+			if (scope_wide_protected.contains(assignment.name)) {
+				throw CommandException("`{}` is protected, cannot assign to this name.", assignment.name);
+			}
 			for (auto scope = scope_stack.rbegin(); scope != scope_stack.rend(); ++scope) {
 				if (scope->find(assignment.name) != scope->end()) {
 					scope->at(assignment.name) = excute_expression(assignment.expression);

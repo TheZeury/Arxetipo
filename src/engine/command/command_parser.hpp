@@ -33,13 +33,13 @@ namespace arx
 	{
 		/// <summary>
 		/// Awaiting nodes are completed by themselves, but waiting to joint to their parent nodes.
-		/// Possible nodes that wait to join to their parent nodes: indentifier(waiting to become a method name or an independent expression)
+		/// Possible nodes that wait to join to their parent nodes: indentifier(waiting to become a method name or an independent expression), expression, statement(waiting to became part of function body).
 		/// </summary>
 		std::stack<CommandASTNode> awaiting_nodes;
 
 		/// <summary>
 		/// Processing node are uncompleted and waiting for their child nodes to be completed.
-		/// Possible node that waits for child nodes: method body(waiting for child statements), method call(waiting for arguments).
+		/// Possible node that waits for child nodes: method body(waiting for child statements), method call(waiting for arguments), operation(waiting for right operand), parentheses(waiting for expression).
 		/// </summary>
 		std::stack<CommandASTNode> processing_nodes;
 

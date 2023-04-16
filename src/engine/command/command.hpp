@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <iostream>
 #include <functional>
+#include <unordered_set>
 
 namespace arx 
 {

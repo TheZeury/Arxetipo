@@ -59,9 +59,9 @@ namespace arx
 			mesh_models.erase(mesh_models.find({ material, model, &(transform->global_matrix) }));
 			transforms.erase(transforms.find(transform));
 #else
-			auto itr_m = models.find({ material, model, &(transform->global_matrix) });
-			if (itr_m != models.end()) {
-				models.erase(itr_m);
+			auto itr_m = mesh_models.find({ material, model, &(transform->global_matrix) });
+			if (itr_m != mesh_models.end()) {
+				mesh_models.erase(itr_m);
 			}
 			auto itr_t = transforms.find(transform);
 			if (itr_t != transforms.end()) {
