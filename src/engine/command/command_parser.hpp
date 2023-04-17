@@ -11,6 +11,8 @@ namespace arx
 			Number,
 			Separator,
 			Operator,
+			Special,
+			MethodRelated,
 			Eof,
 		};
 		Type type;
@@ -60,185 +62,19 @@ namespace arx
 				break;
 			}
 			case CommandToken::Type::Separator: {
-				if (token.value == ",") {
-					auto submitted = submit_preceding_operations(",");
-
-					if (awaiting_nodes.top().type != CommandASTNode::Type::Expression) {
-						throw CommandException("Unexpected comma`,`. Comma`,` can only be used to terminate expression.");
-					}
-
-					auto& expression = std::get<CommandASTExpressionNode>(awaiting_nodes.top().value);
-					if (processing_nodes.top().type == CommandASTNode::Type::Expression) {
-						auto& parent_expression = std::get<CommandASTExpressionNode>(processing_nodes.top().value);
-						if (parent_expression.type == CommandASTExpressionNode::Type::MethodCall) {
-							auto& method_call = std::get<CommandASTMethodCallNode>(parent_expression.value);
-							method_call.arguments.push_back(std::move(expression)); // TODO try to not move;
-							awaiting_nodes.pop();
-						}
-						else {
-							throw CommandException("Unsupport usage of comma`,`. Comma`,` can only be used to separate method arguments at this point.\n Future feature: tuple");
-						}
-					}
-					else {
-						throw CommandException("Unsupport usage of comma`,`. Comma`,` can only be used to separate method arguments at this point.");
-					}
-				}
-				else if (token.value == "(") {
-					if (awaiting_nodes.top().type == CommandASTNode::Type::Expression) {
-						auto& expression = std::get<CommandASTExpressionNode>(awaiting_nodes.top().value);
-						if (expression.type == CommandASTExpressionNode::Type::Identifier) { // Turn identifier into method call.
-							std::string name = std::get<CommandASTIdentifierNode>(expression.value).name;
-							awaiting_nodes.pop();
-							processing_nodes.push(CommandASTNode::make_method_call(name, { }));
-							awaiting_nodes.push(CommandASTNode::make_none()); // Barrier.
-						}
-						else {
-							throw CommandException("Unsupported parentheses usage. Identifier is the only expression type that can be used as a method name at this point.");
-						}
-					}
-					else {
-						processing_nodes.push(CommandASTNode::make_parentheses({ }));
-						awaiting_nodes.push(CommandASTNode::make_none()); // Barrier.
-					}
-				}
-				else if (token.value == ")") {
-					auto submitted = submit_preceding_operations(","); // As if a comma(,) is encountered.
-					
-					if (processing_nodes.top().type != CommandASTNode::Type::Expression) {
-						throw CommandException("Unexpected close parentheses`)`. Close parentheses`)` appeared but there's nothing to be terminated.");
-					}
-
-					auto& parent_expression = std::get<CommandASTExpressionNode>(processing_nodes.top().value);
-					if (parent_expression.type == CommandASTExpressionNode::Type::MethodCall) {
-						auto& method_call = std::get<CommandASTMethodCallNode>(parent_expression.value);
-						if (awaiting_nodes.top().type == CommandASTNode::Type::Expression) {
-							auto& expression = std::get<CommandASTExpressionNode>(awaiting_nodes.top().value);
-							method_call.arguments.push_back(std::move(expression));
-							awaiting_nodes.pop();
-						}
-						if (awaiting_nodes.top().type != CommandASTNode::Type::None) {
-							throw CommandException("Incorrect method call. Multiple arguments must be separated by comma`,`.");
-						}
-						awaiting_nodes.pop(); // Remove the barrier None node.
-						awaiting_nodes.push(std::move(processing_nodes.top())); // TODO. try not move.
-						processing_nodes.pop();
-					}
-					else if (parent_expression.type == CommandASTExpressionNode::Type::Parentheses) {
-						auto& parentheses = std::get<CommandASTParenthesesNode>(parent_expression.value);
-
-						if (awaiting_nodes.top().type == CommandASTNode::Type::None) {
-							awaiting_nodes.pop(); // Remove barrier.
-							awaiting_nodes.push(CommandASTNode{ CommandASTNode::Type::Expression,
-								CommandASTExpressionNode { CommandASTExpressionNode::Type::Empty, { } }
-							});
-							processing_nodes.pop();
-						}
-						else if (awaiting_nodes.top().type == CommandASTNode::Type::Expression) {
-							auto& expression = std::get<CommandASTExpressionNode>(awaiting_nodes.top().value);
-							parentheses.expressions.push_back(std::move(expression)); // TODO. try not move.
-							awaiting_nodes.pop();
-							if (awaiting_nodes.top().type != CommandASTNode::Type::None) {
-								throw CommandException("Incorrect expression. Only one expression can be put in a pair of parenthesis.");
-							}
-							awaiting_nodes.pop(); // Remove the barrier None node.
-							awaiting_nodes.push(std::move(processing_nodes.top())); // TODO. try not move.
-							processing_nodes.pop();
-						}
-					}
-					else {
-						throw CommandException("Unexpected close parenthesis`)`. Close parenthesis`)` appeared but there's nothing to be terminated.");
-					}
-				}
-				else if (token.value == ";") {
-					submit_preceding_operations(";");
-					CommandASTStatementNode statement{ { }, { } };
-					if (processing_nodes.top().type == CommandASTNode::Type::Statement) {
-						statement = std::move(std::get<CommandASTStatementNode>(processing_nodes.top().value));
-						if (statement.type == CommandASTStatementNode::Type::Assignment) {
-							auto& assignment = std::get<CommandASTAssignmentNode>(statement.value);
-							if (awaiting_nodes.top().type == CommandASTNode::Type::Expression) {
-								auto& expression = std::get<CommandASTExpressionNode>(awaiting_nodes.top().value);
-								assignment.expression = std::move(expression);
-								awaiting_nodes.pop();
-							
-								if (awaiting_nodes.top().type != CommandASTNode::Type::None) {
-									throw CommandException("Only one expression can be assigned.");
-								}
-								awaiting_nodes.pop(); // Remove barrier.
-								processing_nodes.pop();
-							}
-							else if (awaiting_nodes.top().type == CommandASTNode::Type::None) { // None is not a legal node in AST, but a barrier for parser.
-								throw CommandException("Assignment terminated but no expression found. \nHint: If you want to assign an empty value to a non-existing indetifier, simply use `name;`");
-							}
-							else {
-								throw CommandException("Assigning a non-expression node is not allowed.");
-							}
-						}
-						else {
-							throw CommandException("Unsupported statement type.");
-						}
-					}
-					else if (awaiting_nodes.top().type == CommandASTNode::Type::Expression) {
-						auto& expression = std::get<CommandASTExpressionNode>(awaiting_nodes.top().value);
-						statement = CommandASTStatementNode{ CommandASTStatementNode::Type::Expression, std::move(expression) };
-						awaiting_nodes.pop();
-					}
-					else if (awaiting_nodes.top().type == CommandASTNode::Type::None) {
-						throw CommandException("Unexpected semicolon`;`. Empty statement is not allowed.");
-					}
-					else {
-						throw CommandException("Unexpected semicolon`;`.");
-					}
-
-					if (processing_nodes.size() == 1) {
-						interpreter << statement;
-					}
-					else {
-						throw CommandException("Unsupported syntex. A Statemet must be at top level at this point.");
-					}
-				}
-				else {
-					throw CommandException("Unexpected separator token`{}`.", token.value);
-				}
+				parse_separator(token);
 				break;
 			}
 			case CommandToken::Type::Operator: {
-				auto op = token.value;
-				if (op == "=") {
-					if (awaiting_nodes.top().type != CommandASTNode::Type::Expression) {
-						throw CommandException("Assigment`=` must follow a expression.");
-					}
-					auto& expression = std::get<CommandASTExpressionNode>(awaiting_nodes.top().value);
-
-					if (expression.type == CommandASTExpressionNode::Type::Identifier) {
-						std::string name = std::get<CommandASTIdentifierNode>(expression.value).name;
-						awaiting_nodes.pop();
-						processing_nodes.push(CommandASTNode::make_assignment(name, { { }, { } }));
-						awaiting_nodes.push(CommandASTNode::make_none()); // Barrier.
-					}
-					else {
-						throw CommandException("Unsupported assignment`=` usage. Assignment`=` must follow a indentifier name at this point.\n Future feature: tuple");
-					}
-				}
-				else if (op == "^" || op == "%") {
-					throw CommandException("Operators power`^` and modulo`%` are not supported yet.");
-				}
-				else if ((op == "+" || op == "-") && awaiting_nodes.top().type == CommandASTNode::Type::None) {
-					op = "'" + op; // '+ and '-
-					processing_nodes.push(CommandASTNode::make_operation(to_operation_type(op), 1, { }));
-					awaiting_nodes.push(CommandASTNode::make_none());
-				}
-				else { // + - * /
-					submit_preceding_operations(op);
-					if (awaiting_nodes.top().type != CommandASTNode::Type::Expression) {
-						throw CommandException("Left hand operant of {} not existing.", op);
-					}
-					processing_nodes.push(CommandASTNode::make_operation(to_operation_type(op), 2, {  }));
-					auto& operation = std::get<CommandASTOperationNode>(std::get<CommandASTExpressionNode>(processing_nodes.top().value).value);
-					operation.operands.push_back(std::move(std::get<CommandASTExpressionNode>(awaiting_nodes.top().value)));
-					awaiting_nodes.pop();
-					awaiting_nodes.push(CommandASTNode::make_none());
-				}
+				parse_operator(token);
+				break;
+			}
+			case CommandToken::Type::Special: {
+				parse_special(token);
+				break;
+			}
+			case CommandToken::Type::MethodRelated: {
+				parse_method_related(token);
 				break;
 			}
 			case CommandToken::Type::Eof: {
@@ -248,6 +84,386 @@ namespace arx
 				break;
 			}
 			return *this;
+		}
+
+		auto parse_separator(const CommandToken& token) -> void {
+			if (token.value == "(" || token.value == ")") {
+				parse_parentheses(token);
+			}
+			else if (token.value == "[" || token.value == "]") {
+				parse_brackets(token);
+			}
+			else if (token.value == "{" || token.value == "}") {
+				parse_braces(token);
+			}
+			else if (token.value == ",") {
+				parse_comma(token);
+			}
+			else if (token.value == ";") {
+				parse_semicolon(token);
+			}
+			else {
+				throw CommandException("Unsupported separator token`{}`.", token.value);
+			}
+		}
+
+		auto parse_operator(const CommandToken& token) -> void {
+			auto op = token.value;
+			if (op == "=") {
+				if (awaiting_nodes.top().type != CommandASTNode::Type::Expression) {
+					throw CommandException("Assigment`=` must follow a expression.");
+				}
+				auto& expression = std::get<CommandASTExpressionNode>(awaiting_nodes.top().value);
+
+				if (expression.type == CommandASTExpressionNode::Type::Identifier) {
+					std::string name = std::get<CommandASTIdentifierNode>(expression.value).name;
+					awaiting_nodes.pop();
+					processing_nodes.push(CommandASTNode::make_assignment(name, { { }, { } }));
+					awaiting_nodes.push(CommandASTNode::make_none()); // Barrier.
+				}
+				else {
+					throw CommandException("Unsupported assignment`=` usage. Assignment`=` must follow a indentifier name at this point.\n Future feature: tuple");
+				}
+			}
+			else if (op == "^" || op == "%") {
+				throw CommandException("Operators power`^` and modulo`%` are not supported yet.");
+			}
+			else if ((op == "+" || op == "-") && awaiting_nodes.top().type == CommandASTNode::Type::None) {
+				op = "'" + op; // '+ and '-
+				processing_nodes.push(CommandASTNode::make_operation(to_operation_type(op), 1, { }));
+				awaiting_nodes.push(CommandASTNode::make_none());
+			}
+			else { // + - * /
+				submit_preceding_operations(op);
+				if (awaiting_nodes.top().type != CommandASTNode::Type::Expression) {
+					throw CommandException("Left hand operant of {} not existing.", op);
+				}
+				processing_nodes.push(CommandASTNode::make_operation(to_operation_type(op), 2, {  }));
+				auto& operation = std::get<CommandASTOperationNode>(std::get<CommandASTExpressionNode>(processing_nodes.top().value).value);
+				operation.operands.push_back(std::move(std::get<CommandASTExpressionNode>(awaiting_nodes.top().value)));
+				awaiting_nodes.pop();
+				awaiting_nodes.push(CommandASTNode::make_none());
+			}
+		}
+
+		auto parse_parentheses(const CommandToken& token) -> void {
+			if (token.value == "(") {
+				if (awaiting_nodes.top().type == CommandASTNode::Type::Expression) {
+					auto& expression = std::get<CommandASTExpressionNode>(awaiting_nodes.top().value);
+					processing_nodes.push(CommandASTNode::make_method_call(std::make_unique<CommandASTExpressionNode>(std::move(expression)), { }));
+					awaiting_nodes.pop();
+					awaiting_nodes.push(CommandASTNode::make_none()); // Barrier.
+				}
+				else {
+					processing_nodes.push(CommandASTNode::make_parentheses({ }));
+					awaiting_nodes.push(CommandASTNode::make_none()); // Barrier.
+				}
+			}
+			else if (token.value == ")") {
+				auto submitted = submit_preceding_operations(","); // As if a comma(,) is encountered.
+
+				if (processing_nodes.top().type != CommandASTNode::Type::Expression) {
+					throw CommandException("Unexpected close parentheses`)`. Close parentheses`)` appeared but there's nothing to be terminated.");
+				}
+
+				auto& parent_expression = std::get<CommandASTExpressionNode>(processing_nodes.top().value);
+				if (parent_expression.type == CommandASTExpressionNode::Type::MethodCall) {
+					auto& method_call = std::get<CommandASTMethodCallNode>(parent_expression.value);
+					if (awaiting_nodes.top().type == CommandASTNode::Type::Expression) {
+						auto& expression = std::get<CommandASTExpressionNode>(awaiting_nodes.top().value);
+						method_call.arguments.push_back(std::move(expression));
+						awaiting_nodes.pop();
+					}
+					if (awaiting_nodes.top().type != CommandASTNode::Type::None) {
+						throw CommandException("Incorrect method call. Multiple arguments must be separated by comma`,`.");
+					}
+					awaiting_nodes.pop(); // Remove the barrier None node.
+					awaiting_nodes.push(std::move(processing_nodes.top())); // TODO. try not move.
+					processing_nodes.pop();
+				}
+				else if (parent_expression.type == CommandASTExpressionNode::Type::Parentheses) {
+					auto& parentheses = std::get<CommandASTParenthesesNode>(parent_expression.value);
+
+					if (awaiting_nodes.top().type == CommandASTNode::Type::None) {
+						awaiting_nodes.pop(); // Remove barrier.
+						awaiting_nodes.push(CommandASTNode{ CommandASTNode::Type::Expression,
+							CommandASTExpressionNode { CommandASTExpressionNode::Type::Empty, { } }
+							});
+						processing_nodes.pop();
+					}
+					else if (awaiting_nodes.top().type == CommandASTNode::Type::Expression) {
+						auto& expression = std::get<CommandASTExpressionNode>(awaiting_nodes.top().value);
+						parentheses.expressions.push_back(std::move(expression)); // TODO. try not move.
+						awaiting_nodes.pop();
+						if (awaiting_nodes.top().type != CommandASTNode::Type::None) {
+							throw CommandException("Incorrect expression. Only one expression can be put in a pair of parenthesis.");
+						}
+						awaiting_nodes.pop(); // Remove the barrier None node.
+						awaiting_nodes.push(std::move(processing_nodes.top())); // TODO. try not move.
+						processing_nodes.pop();
+					}
+				}
+				else {
+					throw CommandException("Unexpected close parenthesis`)`. Close parenthesis`)` appeared but there's nothing to be terminated.");
+				}
+			}
+			else {
+				throw CommandException("Internal Parser Error: {} is not a parenthese.", token.value);
+			}
+		}
+
+		auto parse_brackets(const CommandToken& token) -> void {
+			if (token.value == "[") {
+				if (awaiting_nodes.top().type != CommandASTNode::Type::None) {
+					throw CommandException("Protection is a statement and must be standalone.");
+				}
+				if (processing_nodes.top().type == CommandASTNode::Type::Expression) {
+					if (std::get<CommandASTExpressionNode>(processing_nodes.top().value).type != CommandASTExpressionNode::Type::MethodBody) {
+						throw CommandException("Protection is a statement and must be standalone.");
+					}
+				}
+				else if (processing_nodes.top().type != CommandASTNode::Type::None) {
+					throw CommandException("Protection is a statement and must be standalone.");
+				}
+
+				processing_nodes.push(CommandASTNode::make_protection({ }));
+				awaiting_nodes.push(CommandASTNode::make_none()); // Barrier.
+			}
+			else if (token.value == "]") {
+				if (processing_nodes.top().type != CommandASTNode::Type::Statement) {
+					throw CommandException("Close bracket`]` appeared, but open bracket`[` is missing.");
+				}
+				auto& statement = std::get<CommandASTStatementNode>(processing_nodes.top().value);
+				if (statement.type != CommandASTStatementNode::Type::Protection) {
+					throw CommandException("Close bracket`]` appeared, but open bracket`[` is missing.");
+				}
+				auto& protection = std::get<CommandASTProtectionNode>(statement.value);
+
+				if (awaiting_nodes.top().type != CommandASTNode::Type::Expression) {
+					throw CommandException("Nothing provided to be protected.");
+				}
+				auto& expression = std::get<CommandASTExpressionNode>(awaiting_nodes.top().value);
+				if (expression.type != CommandASTExpressionNode::Type::Identifier) {
+					throw CommandException("Only identifiers can be protected.");
+				}
+				protection.name = std::get<CommandASTIdentifierNode>(expression.value).name;
+				
+				awaiting_nodes.pop();
+				awaiting_nodes.pop(); // Remove barrier.
+				awaiting_nodes.push(std::move(processing_nodes.top()));
+				processing_nodes.pop();
+			}
+			else {
+				throw CommandException("Internal Parser Error: {} is not a bracket.", token.value);
+			}
+		}
+
+		auto parse_braces(const CommandToken& token) -> void {
+			if (token.value == "{") {
+				if (awaiting_nodes.top().type != CommandASTNode::Type::None) {
+					throw CommandException("Method body can not follow other elements directly like parentheses.");
+				}
+				processing_nodes.push(CommandASTNode::make_method_body({ }));
+				awaiting_nodes.push(CommandASTNode::make_none()); // Barrier.
+			}
+			else if (token.value == "}") {
+				if (awaiting_nodes.top().type != CommandASTNode::Type::None) {
+					throw CommandException("Closing method body but there's an incomplete statement.");
+				}
+				if (processing_nodes.top().type != CommandASTNode::Type::Expression) {
+					throw CommandException("Close brace appeared, but open brace is missing.");
+				}
+				auto& expression = std::get<CommandASTExpressionNode>(processing_nodes.top().value);
+				if (expression.type != CommandASTExpressionNode::Type::MethodBody) {
+					throw CommandException("Close brace appeared, but open brace is missing.");
+				}
+				awaiting_nodes.pop(); // Remove barrier.
+				awaiting_nodes.push(std::move(processing_nodes.top()));
+				processing_nodes.pop();
+			}
+			else {
+				throw CommandException("Internal Parser Error: {} is not a brace.", token.value);
+			}
+		}
+
+		auto parse_comma(const CommandToken& token) -> void {
+			auto submitted = submit_preceding_operations(",");
+
+			if (awaiting_nodes.top().type != CommandASTNode::Type::Expression) {
+				throw CommandException("Unexpected comma`,`. Comma`,` can only be used to terminate expression.");
+			}
+
+			auto& expression = std::get<CommandASTExpressionNode>(awaiting_nodes.top().value);
+			if (processing_nodes.top().type == CommandASTNode::Type::Expression) {
+				auto& parent_expression = std::get<CommandASTExpressionNode>(processing_nodes.top().value);
+				if (parent_expression.type == CommandASTExpressionNode::Type::MethodCall) {
+					auto& method_call = std::get<CommandASTMethodCallNode>(parent_expression.value);
+					method_call.arguments.push_back(std::move(expression)); // TODO try to not move;
+					awaiting_nodes.pop();
+				}
+				else {
+					throw CommandException("Unsupport usage of comma`,`. Comma`,` can only be used to separate method arguments at this point.\n Future feature: tuple");
+				}
+			}
+			else {
+				throw CommandException("Unsupport usage of comma`,`. Comma`,` can only be used to separate method arguments at this point.");
+			}
+		}
+
+		auto parse_semicolon(const CommandToken& token) -> void {
+			submit_preceding_operations(";");
+			CommandASTStatementNode statement{ { }, { } };
+			if (processing_nodes.top().type == CommandASTNode::Type::Statement) {
+				statement = std::move(std::get<CommandASTStatementNode>(processing_nodes.top().value));
+				if (statement.type == CommandASTStatementNode::Type::Assignment) {
+					auto& assignment = std::get<CommandASTAssignmentNode>(statement.value);
+					if (awaiting_nodes.top().type == CommandASTNode::Type::Expression) {
+						auto& expression = std::get<CommandASTExpressionNode>(awaiting_nodes.top().value);
+						assignment.expression = std::move(expression);
+						awaiting_nodes.pop();
+
+						if (awaiting_nodes.top().type != CommandASTNode::Type::None) {
+							throw CommandException("Only one expression can be assigned.");
+						}
+						awaiting_nodes.pop(); // Remove barrier.
+						processing_nodes.pop();
+					}
+					else if (awaiting_nodes.top().type == CommandASTNode::Type::None) { // None is not a legal node in AST, but a barrier for parser.
+						throw CommandException("Assignment terminated but no expression found. \nHint: If you want to assign an empty value to a non-existing indetifier, simply use `name;`");
+					}
+					else {
+						throw CommandException("Assigning a non-expression node is not allowed.");
+					}
+				}
+				else if (statement.type == CommandASTStatementNode::Type::Delete) {
+					auto& deletion = std::get<CommandASTDeleteNode>(statement.value);
+					if (awaiting_nodes.top().type == CommandASTNode::Type::Expression) {
+						auto& expression = std::get<CommandASTExpressionNode>(awaiting_nodes.top().value);
+						if (expression.type != CommandASTExpressionNode::Type::Identifier) {
+							throw CommandException("Only identifiers can be deleted.");
+						}
+						deletion.name = std::get<CommandASTIdentifierNode>(expression.value).name;
+						awaiting_nodes.pop();
+						if (awaiting_nodes.top().type != CommandASTNode::Type::None) {
+							throw CommandException("Only one identifier can be deleted.");
+						}
+						awaiting_nodes.pop(); // Remove barrier.
+						processing_nodes.pop();
+					}
+					else if (awaiting_nodes.top().type == CommandASTNode::Type::None) { // None is not a legal node in AST, but a barrier for parser.
+						throw CommandException("Deletion terminated but no expression found.");
+					}
+					else {
+						throw CommandException("Deleting a non-expression node is not allowed.");
+					}
+				}
+				else if (statement.type == CommandASTStatementNode::Type::Argument) {
+					auto& argument = std::get<CommandASTArgumentNode>(statement.value);
+					if (awaiting_nodes.top().type == CommandASTNode::Type::Expression) {
+						auto& expression = std::get<CommandASTExpressionNode>(awaiting_nodes.top().value);
+						if (expression.type != CommandASTExpressionNode::Type::Identifier) {
+							throw CommandException("Only identifiers can fetch arguments.");
+						}
+						argument.name = std::get<CommandASTIdentifierNode>(expression.value).name;
+						awaiting_nodes.pop();
+						if (awaiting_nodes.top().type != CommandASTNode::Type::None) {
+							throw CommandException("Only one identifier can fetch an argument at once.");
+						}
+						awaiting_nodes.pop(); // Remove barrier.
+						processing_nodes.pop();
+					}
+					else if (awaiting_nodes.top().type == CommandASTNode::Type::None) { 
+						throw CommandException("Argument terminated but no expression found.");
+					}
+					else {
+						throw CommandException("Fething to a non-expression node is not allowed.");
+					}
+				}
+				else {
+					throw CommandException("Unsupported statement type.");
+				}
+			}
+			else if (awaiting_nodes.top().type == CommandASTNode::Type::Expression) {
+				auto& expression = std::get<CommandASTExpressionNode>(awaiting_nodes.top().value);
+				statement = CommandASTStatementNode{ CommandASTStatementNode::Type::Expression, std::move(expression) };
+				awaiting_nodes.pop();
+				if (awaiting_nodes.top().type != CommandASTNode::Type::None) {
+					throw CommandException("Statement not defined.");
+				}
+			}
+			else if (awaiting_nodes.top().type == CommandASTNode::Type::Statement) { // Any statements that are waiting to be submitted.
+				statement = std::move(std::get<CommandASTStatementNode>(awaiting_nodes.top().value));
+				awaiting_nodes.pop();
+			}
+			else if (awaiting_nodes.top().type == CommandASTNode::Type::None) {
+				throw CommandException("Unexpected semicolon`;`. Empty statement is not allowed.");
+			}
+			else {
+				throw CommandException("Unexpected semicolon`;`.");
+			}
+
+			if (processing_nodes.size() == 1) {
+				interpreter << statement;
+			}
+			else {
+				if (processing_nodes.top().type != CommandASTNode::Type::Expression) {
+					throw CommandException("A Statemet must be at top level of the globe or a method body.");
+				}
+				auto& parent_expression = std::get<CommandASTExpressionNode>(processing_nodes.top().value);
+				if (parent_expression.type != CommandASTExpressionNode::Type::MethodBody) {
+					throw CommandException("A Statemet must be at top level of the globe or a method body.");
+				}
+				auto& method_body = std::get<CommandASTMethodBodyNode>(parent_expression.value);
+				method_body.commands.push_back(std::move(statement));
+			}
+		}
+
+		auto parse_special(const CommandToken& token) -> void {
+			if (token.value == "#") {
+				if (awaiting_nodes.top().type != CommandASTNode::Type::None) {
+					throw CommandException("Delete is a statement and must be standalone.");
+				}
+				if (processing_nodes.top().type == CommandASTNode::Type::Expression) {
+					if (std::get<CommandASTExpressionNode>(processing_nodes.top().value).type != CommandASTExpressionNode::Type::MethodBody) {
+						throw CommandException("Delete is a statement and must be standalone.");
+					}
+				}
+				else if (processing_nodes.top().type != CommandASTNode::Type::None) {
+					throw CommandException("Delete is a statement and must be standalone.");
+				}
+
+				processing_nodes.push(CommandASTNode::make_delete({ }));
+				awaiting_nodes.push(CommandASTNode::make_none()); // Barrier.
+			}
+			else {
+				throw CommandException("Unsupported token: {}", token.value);;
+				throw CommandException("Internal Parser Error: {} is not a special.", token.value);
+			}
+		}
+
+		auto parse_method_related(const CommandToken& token) -> void {
+			if (token.value[0] == '<') {
+
+			}
+			else if (token.value[0] == '>') {
+				if (awaiting_nodes.top().type != CommandASTNode::Type::None) {
+					throw CommandException("Argument is a statement and must be standalone.");
+				}
+				if (processing_nodes.top().type == CommandASTNode::Type::Expression) {
+					if (std::get<CommandASTExpressionNode>(processing_nodes.top().value).type != CommandASTExpressionNode::Type::MethodBody) {
+						throw CommandException("Argument is a statement and must be standalone.");
+					}
+				}
+				else if (processing_nodes.top().type != CommandASTNode::Type::None) {
+					throw CommandException("Argument is a statement and must be standalone.");
+				}
+
+				processing_nodes.push(CommandASTNode::make_argument(token.value.length(), { }));
+				awaiting_nodes.push(CommandASTNode::make_none());
+			}
+			else {
+				throw CommandException("Unsupported method related symbol: {}", token.value);
+			}
 		}
 
 		auto submit_preceding_operations(const std::string& operation) -> uint32_t {
@@ -340,6 +556,21 @@ namespace arx
 				else if (is_operator(c)) {
 					parser << CommandToken{ CommandToken::Type::Operator, std::string(1, c) };
 				}
+				else if (is_special(c)) {
+					parser << CommandToken{ CommandToken::Type::Special, std::string(1, c) };
+				}
+				else if (is_method_related(c)) {
+					std::string full;
+					while (is_method_related(c)) {
+						full += c;
+						if (++iter == input.end()) {
+							break;
+						}
+						c = *iter;
+					}
+					--iter;
+					parser << CommandToken{ CommandToken::Type::MethodRelated, full };
+				}
 				else if (is_eof(c)) {
 					parser << CommandToken{ CommandToken::Type::Eof, std::string(1, c) };
 				}
@@ -372,16 +603,22 @@ namespace arx
 			return c == ' ' || c == '\t' || c == '\n' || c == '\r';
 		}
 		auto is_letter(char c) -> bool {
-			return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+			return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_');
 		}
 		auto is_digit(char c) -> bool {
 			return (c >= '0' && c <= '9') || (c == '.');
 		}
 		auto is_separator(char c) -> bool {
-			return c == '(' || c == ')' || c == '{' || c == '}' || c == ',' || c == ';';
+			return c == '(' || c == ')' || c == '{' || c == '}' || c == '[' || c == ']' || c == ',' || c == ';';
 		}
 		auto is_operator(char c) -> bool {
 			return c == '+' || c == '-' || c == '*' || c == '/' || c == '%' || c == '^' || c == '=';
+		}
+		auto is_special(char c) -> bool {
+			return c == '!' || c == '#' || c == '&' || c == '|' || c == '~' || c == '`' || c == '?' || c == ':' ;
+		}
+		auto is_method_related(char c) -> bool {
+			return c == '@' || c == '$' || c == '<' || c == '>'; // Cenvrons are not used as brackets in ACL.
 		}
 		auto is_eof(char c) -> bool {
 			return c == '\0';

@@ -38,7 +38,8 @@ namespace arx
 				break;
 			}
 			case CommandASTExpressionNode::Type::MethodCall: {
-				std::cout << std::get<CommandASTMethodCallNode>(expression.value).method_name << '(';
+				excute_expression(*std::get<CommandASTMethodCallNode>(expression.value).method_body);
+				std::cout << '(';
 				for (auto& argument : std::get<CommandASTMethodCallNode>(expression.value).arguments) {
 					excute_expression(argument);
 					std::cout << ", ";

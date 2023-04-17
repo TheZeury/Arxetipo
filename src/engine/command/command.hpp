@@ -11,6 +11,7 @@
 #include <iostream>
 #include <functional>
 #include <unordered_set>
+#include <optional>
 
 namespace arx 
 {

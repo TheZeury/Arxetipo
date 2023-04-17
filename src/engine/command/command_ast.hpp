@@ -2,6 +2,11 @@
 
 namespace arx
 {
+	template<typename T>
+	auto clone_vector(const std::vector<T>& v) -> std::vector<T>;
+	template<typename T>
+	auto clone_pointer(const std::unique_ptr<T>& v) -> std::unique_ptr<T>;
+
 	// Node begin.
 	struct CommandASTNode;
 
@@ -11,6 +16,10 @@ namespace arx
 		CommandASTNoneNode& operator=(CommandASTNoneNode&&) = default;
 		CommandASTNoneNode() = default;
 		static auto make() -> CommandASTNoneNode {
+			return CommandASTNoneNode{};
+		}
+
+		auto clone() const -> CommandASTNoneNode {
 			return CommandASTNoneNode{};
 		}
 	};
@@ -30,6 +39,10 @@ namespace arx
 		static auto make(float value) -> CommandASTNumberNode {
 			return CommandASTNumberNode{ value };
 		}
+
+		auto clone() const -> CommandASTNumberNode {
+			return CommandASTNumberNode{ value };
+		}
 	};
 
 	struct CommandASTIdentifierNode
@@ -42,6 +55,10 @@ namespace arx
 		CommandASTIdentifierNode(const std::string& name) : name(name) { }
 
 		static auto make(const std::string& name) -> CommandASTIdentifierNode {
+			return CommandASTIdentifierNode{ name };
+		}
+
+		auto clone() const -> CommandASTIdentifierNode {
 			return CommandASTIdentifierNode{ name };
 		}
 	};
@@ -72,6 +89,10 @@ namespace arx
 		static auto make(Type type, uint32_t operand_count, std::vector<CommandASTExpressionNode>&& operands) -> CommandASTOperationNode {
 			return CommandASTOperationNode{ type, operand_count, std::move(operands) };
 		}
+
+		auto clone() const -> CommandASTOperationNode {
+			return CommandASTOperationNode{ type, operand_count, clone_vector(operands) };
+		}
 	};
 
 	struct CommandASTParenthesesNode
@@ -86,26 +107,48 @@ namespace arx
 		static auto make(std::vector<CommandASTExpressionNode>&& expressions) -> CommandASTParenthesesNode {
 			return CommandASTParenthesesNode{ std::move(expressions) };
 		}
+
+		auto clone() const -> CommandASTParenthesesNode {
+			return CommandASTParenthesesNode{ clone_vector(expressions) };
+		}
 	};
 
+	struct CommandASTStatementNode;
 	struct CommandASTMethodCallNode
 	{
-		std::string method_name;
+		std::unique_ptr<CommandASTExpressionNode> method_body;
 		std::vector<CommandASTExpressionNode> arguments;
 
 		CommandASTMethodCallNode(CommandASTMethodCallNode&&) = default;
 		CommandASTMethodCallNode& operator=(CommandASTMethodCallNode&&) = default;
 
-		CommandASTMethodCallNode(const std::string& method_name, std::vector<CommandASTExpressionNode>&& arguments) : method_name(method_name), arguments(std::move(arguments)) { }
+		CommandASTMethodCallNode(std::unique_ptr<CommandASTExpressionNode>&& method_body, std::vector<CommandASTExpressionNode>&& arguments) : method_body(std::move(method_body)), arguments(std::move(arguments)) { }
 
-		static auto make(const std::string& method_name, std::vector<CommandASTExpressionNode>&& arguments) -> CommandASTMethodCallNode {
-			return CommandASTMethodCallNode{ method_name, std::move(arguments) };
+		static auto make(std::unique_ptr<CommandASTExpressionNode>&& method_body, std::vector<CommandASTExpressionNode>&& arguments) -> CommandASTMethodCallNode {
+			return CommandASTMethodCallNode{ std::move(method_body), std::move(arguments) };
+		}
+
+		auto clone() const -> CommandASTMethodCallNode {
+			return CommandASTMethodCallNode{ clone_pointer(method_body), clone_vector(arguments)};
 		}
 	};
 
 	struct CommandASTMethodBodyNode
 	{
-		std::vector<CommandASTNode> commands;
+		std::vector<CommandASTStatementNode> commands;
+
+		CommandASTMethodBodyNode(CommandASTMethodBodyNode&&) = default;
+		CommandASTMethodBodyNode& operator=(CommandASTMethodBodyNode&&) = default;
+
+		CommandASTMethodBodyNode(std::vector<CommandASTStatementNode>&& commands) : commands(std::move(commands)) { }
+
+		static auto make(std::vector<CommandASTStatementNode>&& commands) -> CommandASTMethodBodyNode {
+			return CommandASTMethodBodyNode{ std::move(commands) };
+		}
+
+		auto clone() const -> CommandASTMethodBodyNode {
+			return CommandASTMethodBodyNode{ clone_vector(commands) };
+		}
 	};
 
 	struct CommandASTExpressionNode
@@ -122,7 +165,7 @@ namespace arx
 		};
 		Type type;
 		std::variant<
-			std::monostate,
+			CommandASTNoneNode,
 			CommandASTNumberNode, 
 			CommandASTIdentifierNode, 
 			CommandASTOperationNode,
@@ -136,7 +179,7 @@ namespace arx
 
 		CommandASTExpressionNode(Type type, 
 			std::variant<
-				std::monostate,
+				CommandASTNoneNode,
 				CommandASTNumberNode,
 				CommandASTIdentifierNode,
 				CommandASTOperationNode,
@@ -165,10 +208,19 @@ namespace arx
 				CommandASTParenthesesNode{ std::move(expressions) }
 			};
 		}
-		static auto make_method_call(const std::string& method_name, std::vector<CommandASTExpressionNode>&& arguments) -> CommandASTExpressionNode {
+		static auto make_method_call(std::unique_ptr<CommandASTExpressionNode>&& method_body, std::vector<CommandASTExpressionNode>&& arguments) -> CommandASTExpressionNode {
 			return CommandASTExpressionNode{ CommandASTExpressionNode::Type::MethodCall,
-				CommandASTMethodCallNode{ method_name, std::move(arguments) }
+				CommandASTMethodCallNode{ std::move(method_body), std::move(arguments) }
 			};
+		}
+		static auto make_method_body(std::vector<CommandASTStatementNode>&& commands) -> CommandASTExpressionNode {
+			return CommandASTExpressionNode{ CommandASTExpressionNode::Type::MethodBody,
+				CommandASTMethodBodyNode{ std::move(commands) }
+			};
+		}
+
+		auto clone() const -> CommandASTExpressionNode {
+			return CommandASTExpressionNode{ type, std::visit( [](auto& v) -> decltype(value) { return v.clone(); }, value) };
 		}
 	}; 
 	// ExpressionNode complete.
@@ -189,16 +241,82 @@ namespace arx
 		static auto make(const std::string& name, CommandASTExpressionNode&& expression) -> CommandASTAssignmentNode {
 			return CommandASTAssignmentNode{ name, std::move(expression) };
 		}
+
+		auto clone() const -> CommandASTAssignmentNode {
+			return CommandASTAssignmentNode{ name, expression.clone() };
+		}
+	};
+
+	struct CommandASTProtectionNode {
+		std::string name;
+
+		CommandASTProtectionNode(CommandASTProtectionNode&&) = default;
+		CommandASTProtectionNode& operator=(CommandASTProtectionNode&&) = default;
+
+		CommandASTProtectionNode(const std::string& name) : name(name) { }
+
+		static auto make(const std::string& name) -> CommandASTProtectionNode {
+			return CommandASTProtectionNode{ name };
+		}
+
+		auto clone() const -> CommandASTProtectionNode {
+			return CommandASTProtectionNode{ name };
+		}
 	};
 
 	struct CommandASTDeleteNode
 	{
 		std::string name;
+
+		CommandASTDeleteNode(CommandASTDeleteNode&&) = default;
+		CommandASTDeleteNode& operator=(CommandASTDeleteNode&&) = default;
+
+		CommandASTDeleteNode(const std::string& name) : name(name) { }
+
+		static auto make(const std::string& name) -> CommandASTDeleteNode {
+			return CommandASTDeleteNode{ name };
+		}
+
+		auto clone() const -> CommandASTDeleteNode {
+			return CommandASTDeleteNode{ name };
+		}
+	};
+
+	struct CommandASTArgumentNode
+	{
+		size_t length;
+		std::string name;
+
+		CommandASTArgumentNode(CommandASTArgumentNode&&) = default;
+		CommandASTArgumentNode& operator=(CommandASTArgumentNode&&) = default;
+		
+		CommandASTArgumentNode(size_t length, const std::string& name) : length(length), name(name) { }
+
+		static auto make(size_t length, const std::string& name) -> CommandASTArgumentNode {
+			return CommandASTArgumentNode{ length, name };
+		}
+
+		auto clone() const -> CommandASTArgumentNode {
+			return CommandASTArgumentNode{ length, name };
+		}
 	};
 
 	struct CommandASTReturnNode
 	{
 		CommandASTExpressionNode expression;
+
+		CommandASTReturnNode(CommandASTReturnNode&&) = default;
+		CommandASTReturnNode& operator=(CommandASTReturnNode&&) = default;
+
+		CommandASTReturnNode(CommandASTExpressionNode&& expression) : expression(std::move(expression)) { }
+
+		static auto make(CommandASTExpressionNode&& expression) -> CommandASTReturnNode {
+			return CommandASTReturnNode{ std::move(expression) };
+		}
+
+		auto clone() const -> CommandASTReturnNode {
+			return CommandASTReturnNode{ expression.clone() };
+		}
 	};
 
 	struct CommandASTStatementNode
@@ -208,15 +326,19 @@ namespace arx
 			Empty,
 			Assignment,
 			Expression,
+			Protection,
 			Delete,
+			Argument,
 			Return,
 		};
 		Type type;
 		std::variant<
-			std::monostate,
+			CommandASTNoneNode,
 			CommandASTAssignmentNode,
 			CommandASTExpressionNode, // TODO: Consider a unique node type rather than using the expression node directly.
+			CommandASTProtectionNode,
 			CommandASTDeleteNode,
+			CommandASTArgumentNode,
 			CommandASTReturnNode
 		> value;
 
@@ -225,10 +347,12 @@ namespace arx
 
 		CommandASTStatementNode(Type type,
 			std::variant<
-				std::monostate,
+				CommandASTNoneNode,
 				CommandASTAssignmentNode,
 				CommandASTExpressionNode,
+				CommandASTProtectionNode,
 				CommandASTDeleteNode,
+				CommandASTArgumentNode,
 				CommandASTReturnNode
 			>&& value) : type(type), value(std::move(value)) { }
 
@@ -242,6 +366,30 @@ namespace arx
 				std::move(expression)
 			};
 		}
+		static auto make_protection(const std::string& name) -> CommandASTStatementNode {
+			return CommandASTStatementNode{ CommandASTStatementNode::Type::Protection,
+				CommandASTProtectionNode{ name }
+			};
+		}
+		static auto make_delete(const std::string& name) -> CommandASTStatementNode {
+			return CommandASTStatementNode{ CommandASTStatementNode::Type::Delete,
+				CommandASTDeleteNode{ name }
+			};
+		}
+		static auto make_argument(size_t length, const std::string& name) -> CommandASTStatementNode {
+			return CommandASTStatementNode{ CommandASTStatementNode::Type::Argument,
+				CommandASTArgumentNode{ length, name }
+			};
+		}
+		static auto make_return(CommandASTExpressionNode&& expression) -> CommandASTStatementNode {
+			return CommandASTStatementNode{ CommandASTStatementNode::Type::Return,
+				CommandASTReturnNode{ std::move(expression) }
+			};
+		}
+
+		auto clone() const -> CommandASTStatementNode {
+			return CommandASTStatementNode{ type, std::visit([](auto& v) -> decltype(value) { return v.clone(); }, value) };
+		}
 	};
 	// StatementNode complete.
 
@@ -252,7 +400,6 @@ namespace arx
 			None,
 			Expression,
 			Statement,
-			MethodDefination,
 		};
 		Type type;
 		std::variant<
@@ -297,10 +444,17 @@ namespace arx
 				}
 			};
 		}
-		static auto make_method_call(const std::string& method_name, std::vector<CommandASTExpressionNode>&& arguments) -> CommandASTNode {
+		static auto make_method_call(std::unique_ptr<CommandASTExpressionNode>&& method_body, std::vector<CommandASTExpressionNode>&& arguments) -> CommandASTNode {
 			return CommandASTNode{ CommandASTNode::Type::Expression,
 				CommandASTExpressionNode{ CommandASTExpressionNode::Type::MethodCall,
-					CommandASTMethodCallNode{ method_name, std::move(arguments) }
+					CommandASTMethodCallNode{ std::move(method_body), std::move(arguments) }
+				}
+			};
+		}
+		static auto make_method_body(std::vector<CommandASTStatementNode>&& commands) -> CommandASTNode {
+			return CommandASTNode{ CommandASTNode::Type::Expression,
+				CommandASTExpressionNode{ CommandASTExpressionNode::Type::MethodBody,
+					CommandASTMethodBodyNode{ std::move(commands) }
 				}
 			};
 		}
@@ -311,9 +465,54 @@ namespace arx
 				}
 			};
 		}
+		static auto make_expression_statement(CommandASTExpressionNode&& expression) -> CommandASTNode {
+			return CommandASTNode{ CommandASTNode::Type::Statement,
+				CommandASTStatementNode{ CommandASTStatementNode::Type::Expression,
+					std::move(expression)
+				}
+			};
+		}
+		static auto make_protection(const std::string& name) -> CommandASTNode {
+			return CommandASTNode{ CommandASTNode::Type::Statement,
+				CommandASTStatementNode{ CommandASTStatementNode::Type::Protection,
+					CommandASTProtectionNode{ name }
+				}
+			};
+		}
+		static auto make_delete(const std::string& name) -> CommandASTNode {
+			return CommandASTNode{ CommandASTNode::Type::Statement,
+				CommandASTStatementNode{ CommandASTStatementNode::Type::Delete,
+					CommandASTDeleteNode{ name }
+				}
+			};
+		}
+		static auto make_argument(size_t length, const std::string& name) -> CommandASTNode {
+			return CommandASTNode{ CommandASTNode::Type::Statement,
+				CommandASTStatementNode{ CommandASTStatementNode::Type::Argument,
+					CommandASTArgumentNode{ length, name }
+				}
+			};
+		}
+
+		auto clone() const -> CommandASTNode {
+			return CommandASTNode{ type, std::visit([](auto& v) -> decltype(value) { return v.clone(); }, value) };
+		}
 	};
 
+	template<typename T>
+	auto clone_vector(const std::vector<T>& v) -> std::vector<T> {
+		std::vector<T> result;
+		result.reserve(v.size());
+		for (const auto& e : v) {
+			result.push_back(e.clone());
+		}
+		return result;
+	}
 
+	template<typename T>
+	auto clone_pointer(const std::unique_ptr<T>& v) -> std::unique_ptr<T> {
+		return std::make_unique<T>(v->clone());
+	}
 
 	auto to_string(CommandASTOperationNode::Type operation) -> std::string {
 		switch (operation) {

@@ -5,6 +5,7 @@ namespace arx
 	struct CommandRuntime {
 		std::istream& input;
 		std::ostream& output;
+		std::ostream& error;
 
 		CommandKernel kernel;
 		CommandParser<CommandKernel> parser;
@@ -12,7 +13,7 @@ namespace arx
 
 		bool exit = false;
 
-		CommandRuntime(std::istream& input, std::ostream& output) : input{ input }, output{ output }, kernel{}, parser{ kernel }, lexer{ parser } {
+		CommandRuntime(std::istream& input, std::ostream& output, std::ostream& error = std::cerr) : input{ input }, output{ output }, error{ error }, kernel{}, parser{ kernel }, lexer{ parser } {
 			kernel.add_method("print", [&](const std::vector<CommandValue>& arguments, CommandValue& result) {
 				for (const auto& argument : arguments) {
 					output << argument.to_string() << std::endl;
@@ -28,7 +29,6 @@ namespace arx
 		auto run() -> void {
 			while (!exit) {
 				try {
-					output << "> ";
 					output.flush();
 					std::string line;
 					std::getline(input, line);
@@ -38,7 +38,7 @@ namespace arx
 					lexer << line;
 				}
 				catch (const CommandException& exception) {
-					output << exception.what() << std::endl;
+					error << exception.what() << std::endl;
 					while (parser.awaiting_nodes.size() > 1) {
 						parser.awaiting_nodes.pop();
 					}
