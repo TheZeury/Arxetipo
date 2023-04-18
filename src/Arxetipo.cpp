@@ -6,6 +6,7 @@
 #include "engine/xr/openxr_plugin.hpp"
 #include "engine/common_objects/common_objects.hpp"
 #include "engine/renderer/graphics_objects.hpp"
+#include "engine/command/command.hpp"
 
 #include <chrono>
 
@@ -29,6 +30,23 @@ int main() {
 		auto test_sphere = arx::MeshModelComponent{ renderer.defaults.sample_sphere, renderer.defaults.default_material, &transform };
 		test_sphere.register_to_systems(&graphics_system);
 		graphics_system.mobilize();
+
+		arx::CommandRuntime runtime{ std::cin, std::cout };
+		runtime.kernel.add_method("set", [&](const std::vector<arx::CommandValue>& arguments, arx::CommandValue& result) {
+			if (arguments.size() != 3) {
+				throw arx::CommandException{ "set requires 3 arguments." };
+			}
+			for (auto& argument : arguments) {
+				if (argument.type != arx::CommandValue::Type::Number) {
+					throw arx::CommandException{ "coordinates must be numbers." };
+				}
+			}
+			origin.set_local_position({ std::get<float>(arguments[0].value), std::get<float>(arguments[1].value), std::get<float>(arguments[2].value) });
+		}, true);
+
+		std::jthread command_thread([&runtime]() {
+			runtime.run();
+		});
 
 		auto start_time = std::chrono::high_resolution_clock::now();
 		auto last_time = start_time;
