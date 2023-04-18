@@ -170,11 +170,14 @@ exit();
 
 `>[identifier];`
 
+`>>>>>>[identifier]`
+
 `[identifier] = >;` This is acutally a assignment but has the same effect.
 
 ```
 >a;
 b = >;
+>>c; // c fetches an argument of the outer method.
 ```
 
 #### Return
@@ -187,7 +190,7 @@ b = >;
 <; // Implicitly return ().
 <(); // Explicitly return ().
 <<; // Double return. Return two scopes with value ().
-<<<<< 20; // Return five scopes with the value 20.
+<<<<< 20; // Return five methods with the value 20.
 ```
 
 #### Delete

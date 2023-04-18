@@ -147,6 +147,10 @@ namespace arx
 				excute_argument(std::get<CommandASTArgumentNode>(statement.value));
 				break;
 			}
+			case CommandASTStatementNode::Type::Return: {
+				excute_return(std::get<CommandASTReturnNode>(statement.value));
+				break;
+			}
 			case CommandASTStatementNode::Type::Delete: {
 				excute_delete(std::get<CommandASTDeleteNode>(statement.value));
 				break;
@@ -236,8 +240,11 @@ namespace arx
 					scope_stack.back().insert({ "@i", CommandValue{ CommandValue::Type::Number, 0.f } });
 					for (auto& statement : method_body->commands) {
 						*this << statement;
+						if (statement.type == CommandASTStatementNode::Type::Return) {
+							break;
+						}
 					}
-					result = CommandValue{ CommandValue::Type::Empty, std::monostate{ } };
+					result = scope_stack.back().find("&") != scope_stack.back().end() ? scope_stack.back().at("&") : CommandValue{CommandValue::Type::Empty, std::monostate{}};
 					scope_stack.pop_back();
 				};
 				return CommandValue{ CommandValue::Type::Method, method };
@@ -279,6 +286,10 @@ namespace arx
 			if (scope_wide_protected.contains(argument.name)) {
 				throw CommandException("`{}` is protected, cannot assign to this name.", argument.name);
 			}
+			if (argument.length > scope_stack.size()) {
+				throw CommandException("Scope doesn't exist.");
+			}
+
 			auto skip = argument.length - 1;
 
 			if (scope_stack.rbegin()[skip].find("@") == scope_stack.rbegin()[skip].end()) {
@@ -303,6 +314,20 @@ namespace arx
 				}
 			}
 			scope_stack.rbegin()->insert({ argument.name, value });
+		}
+
+		auto excute_return(const CommandASTReturnNode& returning) -> void {
+			if (returning.length > scope_stack.size()) {
+				throw CommandException("Scope doesn't exist.");
+			}
+
+			auto skip = returning.length - 1;
+
+			if (skip != 0) {
+				throw CommandException("Multiple return is not supported yet.");
+			}
+
+			scope_stack.rbegin()[skip].insert({ "&", excute_expression(returning.expression) });
 		}
 
 		auto excute_delete(const CommandASTDeleteNode& deletion) -> void {

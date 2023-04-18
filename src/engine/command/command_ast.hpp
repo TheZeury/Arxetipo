@@ -188,6 +188,12 @@ namespace arx
 				CommandASTMethodBodyNode
 			>&& value) : type(type), value(std::move(value)) { }
 
+		static auto make_none() -> CommandASTExpressionNode {
+			return CommandASTExpressionNode { CommandASTExpressionNode::Type::Empty,
+				CommandASTNoneNode{ }
+			};
+		}
+
 		static auto make_number(float value) -> CommandASTExpressionNode {
 			return CommandASTExpressionNode{ CommandASTExpressionNode::Type::Number,
 				CommandASTNumberNode{ value }
@@ -303,19 +309,20 @@ namespace arx
 
 	struct CommandASTReturnNode
 	{
+		size_t length;
 		CommandASTExpressionNode expression;
 
 		CommandASTReturnNode(CommandASTReturnNode&&) = default;
 		CommandASTReturnNode& operator=(CommandASTReturnNode&&) = default;
 
-		CommandASTReturnNode(CommandASTExpressionNode&& expression) : expression(std::move(expression)) { }
+		CommandASTReturnNode(size_t length, CommandASTExpressionNode&& expression) : length(length), expression(std::move(expression)) { }
 
-		static auto make(CommandASTExpressionNode&& expression) -> CommandASTReturnNode {
-			return CommandASTReturnNode{ std::move(expression) };
+		static auto make(size_t length, CommandASTExpressionNode&& expression) -> CommandASTReturnNode {
+			return CommandASTReturnNode{ length, std::move(expression) };
 		}
 
 		auto clone() const -> CommandASTReturnNode {
-			return CommandASTReturnNode{ expression.clone() };
+			return CommandASTReturnNode{ length, expression.clone() };
 		}
 	};
 
@@ -381,9 +388,9 @@ namespace arx
 				CommandASTArgumentNode{ length, name }
 			};
 		}
-		static auto make_return(CommandASTExpressionNode&& expression) -> CommandASTStatementNode {
+		static auto make_return(size_t length, CommandASTExpressionNode&& expression) -> CommandASTStatementNode {
 			return CommandASTStatementNode{ CommandASTStatementNode::Type::Return,
-				CommandASTReturnNode{ std::move(expression) }
+				CommandASTReturnNode{ length, std::move(expression) }
 			};
 		}
 
@@ -490,6 +497,13 @@ namespace arx
 			return CommandASTNode{ CommandASTNode::Type::Statement,
 				CommandASTStatementNode{ CommandASTStatementNode::Type::Argument,
 					CommandASTArgumentNode{ length, name }
+				}
+			};
+		}
+		static auto make_return(size_t length, CommandASTExpressionNode&& expression) -> CommandASTNode {
+			return CommandASTNode{ CommandASTNode::Type::Statement,
+				CommandASTStatementNode{ CommandASTStatementNode::Type::Return,
+					CommandASTReturnNode{ length, std::move(expression) }
 				}
 			};
 		}

@@ -379,6 +379,26 @@ namespace arx
 						throw CommandException("Fething to a non-expression node is not allowed.");
 					}
 				}
+				else if (statement.type == CommandASTStatementNode::Type::Return) {
+					auto& returning = std::get<CommandASTReturnNode>(statement.value);
+					if (awaiting_nodes.top().type == CommandASTNode::Type::Expression) {
+						auto& expression = std::get<CommandASTExpressionNode>(awaiting_nodes.top().value);
+						returning.expression = std::move(expression);
+						awaiting_nodes.pop();
+
+						if (awaiting_nodes.top().type != CommandASTNode::Type::None) {
+							throw CommandException("Only one expression can be assigned.");
+						}
+						awaiting_nodes.pop(); // Remove barrier.
+						processing_nodes.pop();
+					}
+					else if (awaiting_nodes.top().type == CommandASTNode::Type::None) { // None is not a legal node in AST, but a barrier for parser.
+						throw CommandException("Assignment terminated but no expression found. \nHint: If you want to assign an empty value to a non-existing indetifier, simply use `name;`");
+					}
+					else {
+						throw CommandException("Assigning a non-expression node is not allowed.");
+					}
+				}
 				else {
 					throw CommandException("Unsupported statement type.");
 				}
@@ -443,7 +463,20 @@ namespace arx
 
 		auto parse_method_related(const CommandToken& token) -> void {
 			if (token.value[0] == '<') {
+				if (awaiting_nodes.top().type != CommandASTNode::Type::None) {
+					throw CommandException("Return is a statement and must be standalone.");
+				}
+				if (processing_nodes.top().type == CommandASTNode::Type::Expression) {
+					if (std::get<CommandASTExpressionNode>(processing_nodes.top().value).type != CommandASTExpressionNode::Type::MethodBody) {
+						throw CommandException("Return is a statement and must be standalone.");
+					}
+				}
+				else if (processing_nodes.top().type != CommandASTNode::Type::None) {
+					throw CommandException("Return is a statement and must be standalone.");
+				}
 
+				processing_nodes.push(CommandASTNode::make_return(token.value.length(), CommandASTExpressionNode::make_none()));
+				awaiting_nodes.push(CommandASTNode::make_none());
 			}
 			else if (token.value[0] == '>') {
 				if (awaiting_nodes.top().type != CommandASTNode::Type::None) {
