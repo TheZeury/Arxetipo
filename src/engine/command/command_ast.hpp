@@ -45,6 +45,24 @@ namespace arx
 		}
 	};
 
+	struct CommandASTStringNode
+	{
+		std::string value;
+
+		CommandASTStringNode(CommandASTStringNode&&) = default;
+		CommandASTStringNode& operator=(CommandASTStringNode&&) = default;
+
+		CommandASTStringNode(const std::string& value) : value(value) { }
+
+		static auto make(const std::string& value) -> CommandASTStringNode {
+			return CommandASTStringNode{ value };
+		}
+
+		auto clone() const -> CommandASTStringNode {
+			return CommandASTStringNode{ value };
+		}
+	};
+
 	struct CommandASTIdentifierNode
 	{
 		std::string name;
@@ -157,6 +175,7 @@ namespace arx
 		{
 			Empty,
 			Number,
+			String,
 			Identifier,
 			Operation,
 			Parentheses,
@@ -167,6 +186,7 @@ namespace arx
 		std::variant<
 			CommandASTNoneNode,
 			CommandASTNumberNode, 
+			CommandASTStringNode,
 			CommandASTIdentifierNode, 
 			CommandASTOperationNode,
 			CommandASTParenthesesNode,
@@ -181,6 +201,7 @@ namespace arx
 			std::variant<
 				CommandASTNoneNode,
 				CommandASTNumberNode,
+				CommandASTStringNode,
 				CommandASTIdentifierNode,
 				CommandASTOperationNode,
 				CommandASTParenthesesNode,
@@ -197,6 +218,11 @@ namespace arx
 		static auto make_number(float value) -> CommandASTExpressionNode {
 			return CommandASTExpressionNode{ CommandASTExpressionNode::Type::Number,
 				CommandASTNumberNode{ value }
+			};
+		}
+		static auto make_string(const std::string& value) -> CommandASTExpressionNode {
+			return CommandASTExpressionNode{ CommandASTExpressionNode::Type::String,
+				CommandASTStringNode{ value }
 			};
 		}
 		static auto make_identifier(const std::string& name) -> CommandASTExpressionNode {
@@ -427,6 +453,13 @@ namespace arx
 			return CommandASTNode{ CommandASTNode::Type::Expression,
 				CommandASTExpressionNode{ CommandASTExpressionNode::Type::Number,
 					CommandASTNumberNode{ value }
+				}
+			};
+		}
+		static auto make_string(const std::string& value) -> CommandASTNode {
+			return CommandASTNode{ CommandASTNode::Type::Expression,
+				CommandASTExpressionNode{ CommandASTExpressionNode::Type::String,
+					CommandASTStringNode{ value }
 				}
 			};
 		}

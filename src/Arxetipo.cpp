@@ -38,7 +38,7 @@ int main() {
 		arx::SpaceTransform text_transform;
 		text_transform.set_local_position({ 0.f, 0.f, 0.001f });
 		text_transform.set_parent(&panel_transform);
-		auto font = renderer.create_bitmap("C:\\Windows\\Fonts\\CascadiaMono.ttf", 1024, 1024, 150);
+		auto font = renderer.create_bitmap("C:\\Windows\\Fonts\\CascadiaMono.ttf", 1024, 1024, 150); // TODO, temperary, this font does not always exist.
 		auto ui_text = renderer.create_ui_text("hello world", 0.05f, font);
 		auto text = arx::UIElementComponent{ ui_text, font, &text_transform };
 		text.register_to_systems(&graphics_system);
@@ -57,6 +57,24 @@ int main() {
 				}
 			}
 			origin.set_local_position({ std::get<float>(arguments[0].value), std::get<float>(arguments[1].value), std::get<float>(arguments[2].value) });
+		}, true);
+
+		// TODO. This approach is just for testing and example purpose, 
+		// normally there shouldn't be multiple threads using vulkan in this way 
+		// without sychronizing between threads and between CPU and GPU.
+		runtime.kernel.add_method("say", [&](const std::vector<arx::CommandValue>& arguments, arx::CommandValue& result) { 
+			if (arguments.size() != 1) {
+				throw arx::CommandException{ "`say` requires 1 argument." };
+			}
+			auto& argument = arguments[0];
+			if (argument.type != arx::CommandValue::Type::String) {
+				throw arx::CommandException{ "argument must be a string." };
+			}
+			auto& words =std::get<std::string>(argument.value);
+			graphics_system.remove_ui_element(ui_text, font, &text_transform);
+			ui_text = renderer.create_ui_text(words, 0.05f, font);
+			text = arx::UIElementComponent{ ui_text, font, &text_transform };
+			text.register_to_systems(&graphics_system);
 		}, true);
 
 		std::jthread command_thread([&runtime]() {

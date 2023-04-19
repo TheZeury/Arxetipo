@@ -8,11 +8,12 @@ namespace arx
 		{
 			Empty,
 			Number,
+			String,
 			List,
 			Method,
 		};
 		Type type;
-		std::variant<std::monostate, float, std::vector<CommandValue>, std::function<void(const std::vector<CommandValue>&, CommandValue&)>> value;
+		std::variant<std::monostate, float, std::string, std::vector<CommandValue>, std::function<void(const std::vector<CommandValue>&, CommandValue&)>> value;
 
 		auto to_string() const -> std::string {
 			switch (type) {
@@ -21,6 +22,9 @@ namespace arx
 			}
 			case Type::Number: {
 				return std::to_string(std::get<float>(value));
+			}
+			case Type::String: {
+				return std::get<std::string>(value);
 			}
 			case Type::List: {
 				std::string result = "[";
@@ -60,6 +64,9 @@ namespace arx
 			}
 			if (other.type == Type::Empty) {
 				return *this;
+			}
+			if (type == Type::String || other.type == Type::String) {
+				return CommandValue{ Type::String, to_string() + other.to_string() };
 			}
 			if (type == Type::Number && other.type == Type::Number) {
 				return CommandValue{ Type::Number, std::get<float>(value) + std::get<float>(other.value) };
@@ -170,6 +177,9 @@ namespace arx
 			}
 			case CommandASTExpressionNode::Type::Number: {
 				return CommandValue{ CommandValue::Type::Number, std::get<CommandASTNumberNode>(expression.value).value };
+			}
+			case CommandASTExpressionNode::Type::String: {
+				return CommandValue{ CommandValue::Type::String, std::get<CommandASTStringNode>(expression.value).value };
 			}
 			case CommandASTExpressionNode::Type::Identifier: {
 				for (auto scope = scope_stack.rbegin(); scope != scope_stack.rend(); ++scope) {

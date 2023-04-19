@@ -9,6 +9,7 @@ namespace arx
 			None,
 			Name,
 			Number,
+			String,
 			Separator,
 			Operator,
 			Special,
@@ -59,6 +60,10 @@ namespace arx
 			case CommandToken::Type::Number: {
 				float value = std::stof(token.value);
 				awaiting_nodes.push(CommandASTNode::make_number(std::stof(token.value)));
+				break;
+			}
+			case CommandToken::Type::String: {
+				awaiting_nodes.push(CommandASTNode::make_string(token.value));
 				break;
 			}
 			case CommandToken::Type::Separator: {
@@ -583,6 +588,150 @@ namespace arx
 					--iter;
 					parser << CommandToken{ CommandToken::Type::Number, number };
 				}
+				else if (c == '"') {
+					std::string str;
+					c = *++iter;
+					while (c != '"') {
+						if (c == '\\') {
+							if (++iter == input.end()) {
+								break;
+							}
+							c = *iter;
+							switch (c)
+							{
+							case 'n':
+								str += '\n';
+								break;
+							case 'r':
+								str += '\r';
+								break;
+							case 't':
+								str += '\t';
+								break;
+							case 'b':
+								str += '\b';
+								break;
+							case 'f':
+								str += '\f';
+								break;
+							case 'v':
+								str += '\v';
+								break;
+							case 'a':
+								str += '\a';
+								break;
+							case '\\':
+								str += '\\';
+								break;
+							case '\'':
+								str += '\'';
+								break;
+							case '"':
+								str += '"';
+								break;
+							case '?':
+								str += '?';
+								break;
+							case '0':
+								str += '\0';
+								break;
+							case 'x': {
+								if (++iter == input.end()) {
+									break;
+								}
+								c = *iter;
+								if (!is_hex(c)) {
+									throw CommandException("Invalid hex character: {}", c);
+								}
+								uint8_t hex = 0;
+								if (is_digit(c)) {
+									hex = c - '0';
+								}
+								else if (is_lower(c)) {
+									hex = c - 'a' + 10;
+								}
+								else {
+									hex = c - 'A' + 10;
+								}
+
+								if (++iter == input.end()) {
+									break;
+								}
+								c = *iter;
+								if (!is_hex(c)) {
+									throw CommandException("Invalid hex character: {}", c);
+								}
+								hex <<= 4;
+								if (is_digit(c)) {
+									hex |= c - '0';
+								}
+								else if (is_lower(c)) {
+									hex |= c - 'a' + 10;
+								}
+								else {
+									hex |= c - 'A' + 10;
+								}
+								str.push_back(hex);
+								break;
+							}
+							case 'u': {
+								if (++iter == input.end()) {
+									break;
+								}
+								c = *iter;
+								if (!is_hex(c)) {
+									throw CommandException("Invalid hex character: {}", c);
+								}
+								uint16_t hex = 0;
+								if (is_digit(c)) {
+									hex = c - '0';
+								}
+								else if (is_lower(c)) {
+									hex = c - 'a' + 10;
+								}
+								else {
+									hex = c - 'A' + 10;
+								}
+								for (int i = 0; i < 3; ++i) {
+									if (++iter == input.end()) {
+										break;
+									}
+									c = *iter;
+									if (!is_hex(c)) {
+										throw CommandException("Invalid hex character: {}", c);
+									}
+									hex <<= 4;
+									if (is_digit(c)) {
+										hex |= c - '0';
+									}
+									else if (is_lower(c)) {
+										hex |= c - 'a' + 10;
+									}
+									else {
+										hex |= c - 'A' + 10;
+									}
+								}
+								str.push_back(hex);
+								break;
+							}
+							default:
+								throw CommandException("Invalid escape character: {}", c);
+								break;
+							}
+						}
+						else {
+							str += c;
+						}
+						if (++iter == input.end()) {
+							break;
+						}
+						c = *iter;
+					}
+					if (iter == input.end()) {
+						throw CommandException("String is not closed.");
+					}
+					parser << CommandToken{ CommandToken::Type::String, str };
+				}
 				else if (is_separator(c)) {
 					parser << CommandToken{ CommandToken::Type::Separator, std::string(1, c) };
 				}
@@ -655,6 +804,15 @@ namespace arx
 		}
 		auto is_eof(char c) -> bool {
 			return c == '\0';
+		}
+		auto is_hex(char c) -> bool {
+			return is_digit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+		}
+		auto is_capitol(char c) -> bool {
+			return c >= 'A' && c <= 'Z';
+		}
+		auto is_lower(char c) -> bool {
+			return c >= 'a' && c <= 'z';
 		}
 	};
 }
