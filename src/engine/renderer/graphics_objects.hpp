@@ -9,3 +9,4 @@
 
 #include "graphics_objects/graphics_system.hpp"
 #include "graphics_objects/mesh_model_component.hpp"
+#include "graphics_objects/ui_element_component.hpp"

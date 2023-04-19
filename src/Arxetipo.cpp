@@ -23,18 +23,33 @@ int main() {
 		arx::SpaceTransform origin;
 		arx::SpaceTransform transform;
 		arx::SpaceTransform camera_offset_transform;
-		bool camera_offset_set = false;
 		transform.set_local_matrix(glm::translate(glm::mat4{ 1.0f }, glm::vec3{ 0.0f, 1.0f, -2.0f }));
 		transform.set_parent(&origin);
-		camera_offset_transform.set_global_position(glm::vec3{ 0.0f, -1.f, 1.0f });
 		auto test_sphere = arx::MeshModelComponent{ renderer.defaults.sample_sphere, renderer.defaults.default_material, &transform };
 		test_sphere.register_to_systems(&graphics_system);
+
+		arx::SpaceTransform panel_transform;
+		panel_transform.set_local_position({ 0.f, 1.f, -0.3f });
+		//panel_transform.set_parent(&camera_offset_transform);
+		arx::UIElement* ui_panel = renderer.create_ui_panel({ 0.3f, 0.1f });
+		auto panel = arx::UIElementComponent{ ui_panel, renderer.defaults.white_bitmap, &panel_transform };
+		panel.register_to_systems(&graphics_system);
+
+		arx::SpaceTransform text_transform;
+		text_transform.set_local_position({ 0.f, 0.f, 0.001f });
+		text_transform.set_parent(&panel_transform);
+		auto font = renderer.create_bitmap("C:\\Windows\\Fonts\\CascadiaMono.ttf", 1024, 1024, 150);
+		auto ui_text = renderer.create_ui_text("hello world", 0.05f, font);
+		auto text = arx::UIElementComponent{ ui_text, font, &text_transform };
+		text.register_to_systems(&graphics_system);
+
 		graphics_system.mobilize();
+		graphics_system.set_camera_offset_transform(&camera_offset_transform);
 
 		arx::CommandRuntime runtime{ std::cin, std::cout };
 		runtime.kernel.add_method("set", [&](const std::vector<arx::CommandValue>& arguments, arx::CommandValue& result) {
 			if (arguments.size() != 3) {
-				throw arx::CommandException{ "set requires 3 arguments." };
+				throw arx::CommandException{ "`set` requires 3 arguments." };
 			}
 			for (auto& argument : arguments) {
 				if (argument.type != arx::CommandValue::Type::Number) {
@@ -58,11 +73,6 @@ int main() {
 			float time_elapsed = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - start_time).count();
 			float time_delta = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - last_time).count();
 			last_time = currentTime;
-			
-			if (time_elapsed > 10.f && !camera_offset_set) {
-				graphics_system.set_camera_offset_transform(&camera_offset_transform);
-				camera_offset_set = true;
-			}
 
 			origin.set_local_rotation(glm::angleAxis(time_elapsed * glm::pi<float>() / 4.f, glm::vec3{ 0.0f, 1.0f, 0.0f }));
 

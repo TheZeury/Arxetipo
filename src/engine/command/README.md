@@ -1,8 +1,8 @@
-# Arxetipo Command Language
+# Arxemando
 
 ## Overview
 
-Arxetipo Command Language is a simple scripting language for Arxetipo Engine. It can serve several purposes, such as:
+Arxemando is a simple scripting language for Arxetipo Engine. It can serve several purposes, such as:
 
 1. In game command support for players.
 2. Hot-loading temporary logics from servers without updating the game.
@@ -184,6 +184,8 @@ b = >;
 
 `<[expression]`
 
+Multiple return is still not implemented, but it's a planned concept in the language.
+
 ```
 <a;
 < a + 5;
@@ -328,6 +330,8 @@ print(add(3, 5));
 { < > + >; }(2, 3); // return 5.
 // Since a method body returns a method, it can be called directly if you would like to.
 ```
+
+Notice: Methods are not closures, they don't have access to the environment where they are defined.
 
 #### Condition
 

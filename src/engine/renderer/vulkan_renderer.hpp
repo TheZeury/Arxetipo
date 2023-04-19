@@ -11,6 +11,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/hash.hpp>
 #include <stb_image.h>
+#include <stb_truetype.h>
 #include "../helpers/arx_logger.hpp"
 #include "../helpers/arx_math.hpp"
 #include "../proxy/renderer_proxy.hpp"
@@ -18,7 +19,9 @@
 #include "vulkan_renderer/swapchain.hpp"
 #include "vulkan_renderer/texture.hpp"
 #include "vulkan_renderer/material.hpp"
+#include "vulkan_renderer/bitmap.hpp"
 #include "vulkan_renderer/mesh_model.hpp"
+#include "vulkan_renderer/ui_element.hpp"
 
 //export module vulkan_renderer;
 //export import :texture;
@@ -128,9 +131,10 @@ namespace arx
 			log_success();
 		
 			log_step("Vulkan", "Destroying Pipeline");
-			device.destroyPipeline(pipelines.textPipeline);
 			device.destroyPipeline(pipelines.mesh_pipeline);
-			device.destroyPipeline(pipelines.wireframePipeline);
+			device.destroyPipeline(pipelines.ui_pipeline);
+			device.destroyPipeline(pipelines.text_pipeline);
+			device.destroyPipeline(pipelines.wireframe_pipeline);
 			log_success();
 		
 			log_step("Vulkan", "Destroying Pipeline Layout");
@@ -171,34 +175,15 @@ namespace arx
 
 				bool haveText = false;
 				bool haveMesh = !mesh_models.empty();
-				bool haveUI = false;
+				bool haveUI = !ui_elements.empty();
 				bool haveDebug = false;
 
 				glm::mat4 mat_camera_view = glm::inverse(mat_camera_transform);
-
-				//for (auto it = this->scenes.begin(); it != this->scenes.end(); )
-				//{
-				//	auto scene = it->lock();
-				//	if (scene == nullptr)
-				//	{
-				//		it = this->scenes.erase(it);
-				//		continue;
-				//	}
-				//	++it;
-
-				//	scenes.push_back(scene);
 
 				//	haveText |= !(scene->debugMode == SceneDebugMode::eDebugOnly || scene->texts.empty());
 				//	haveMesh |= !(scene->debugMode == SceneDebugMode::eDebugOnly || scene->models.empty());
 				//	haveUI |= !(scene->uiElements.empty());	// No `scene->onlyDebug` like above because we till want to have UI even in debug view.
 				//	haveDebug |= debugOn(scene->debugMode) && !(scene->debugScene == nullptr || scene->debugScene->models.empty());
-
-				//	if (!scene->cameraTransform.expired())
-				//	{
-				//		scene->cameraTransform.lock()->setLocalPosition(*(glm::vec3*)(&(pose->position)));
-				//		scene->cameraTransform.lock()->setLocalRotation(*(glm::quat*)(&(pose->orientation)));
-				//	}
-				//}
 
 				/*if (haveText)
 				{
@@ -264,55 +249,9 @@ namespace arx
 					command_buffer.setScissor(0, 1, swap_chains[view]->getScissor());		// <======== Set Scissors.
 
 					// Draw something.
-					/*for (auto scene : scenes)
-					{
-						if (scene->debugMode == SceneDebugMode::eDebugOnly || scene->models.empty()) continue;
-
-						XrMatrix4x4f matView;		// V
-						if (scene->cameraTransform.expired())
-						{
-							matView = noCameraView;
-						}
-						else
-						{
-							XrMatrix4x4f invView = cnv<XrMatrix4x4f>(scene->cameraTransform.lock()->getGlobalMatrix());
-							XrMatrix4x4f_InvertRigidBody(&matView, &invView);
-						}
-
-						XrMatrix4x4f matProjectionView;	// PV
-						XrMatrix4x4f_Multiply(&matProjectionView, &matProjection, &matView);
-						std::vector<PushConstantData> data(1);
-
-						std::pair<hd::MeshModel, hd::ITransform> last = { nullptr, nullptr };
-						for (auto& pair : scene->models)
-						{
-							auto model = pair.first;
-							if (model != last.first)
-							{
-								model->bind(commandBuffers[view]);
-								commandBuffers[view].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayouts.worldPipelineLayout, 0, { model->material->descriptorSet }, { });
-								last.first = model;
-							}
-
-							auto transform = pair.second;
-							if (transform != last.second)
-							{
-								auto matTransform = pair.second->getGlobalMatrix();	// M
-								data[0].modelMatrix = matTransform;
-								XrMatrix4x4f_Multiply(&(data[0].projectionView), &matProjectionView, (XrMatrix4x4f*)&matTransform);	// PVM
-								commandBuffers[view].pushConstants<PushConstantData>(pipelineLayouts.worldPipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, data);
-							}
-
-							model->draw(commandBuffers[view]);
-						}
-
-					}*/
 					struct { Material* material; MeshModel* mesh_model; glm::mat4* model_transform; } last = { nullptr, nullptr, nullptr };
-					for (auto& models : mesh_models)
-					{
-
-						for (auto [material, mesh_model, model_transform] : *models)
-						{
+					for (auto& models : mesh_models) {
+						for (auto [material, mesh_model, model_transform] : *models) {
 							if (material != last.material) {
 								last.material = material;
 								command_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline_layouts.world_pipeline_layout, 0, { material->descriptor_set }, { });
@@ -337,59 +276,39 @@ namespace arx
 					// End Draw.
 				}
 
-				/*if (haveUI)
+				if (haveUI)
 				{
-					commandBuffers[view].bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.uiPipeline);			// <======= Bind UI Pipeline.
+					command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.ui_pipeline);			// <======= Bind Mesh Pipeline.
 
-					commandBuffers[view].setViewport(0, 1, swapChains[view]->getViewport());		// <======== Set Viewports.
+					command_buffer.setViewport(0, 1, swap_chains[view]->getViewport());		// <======== Set Viewports.
 
-					commandBuffers[view].setScissor(0, 1, swapChains[view]->getScissor());		// <======== Set Scissors.
+					command_buffer.setScissor(0, 1, swap_chains[view]->getScissor());		// <======== Set Scissors.
 
 					// Draw something.
-					for (auto scene : scenes)
-					{
-						if (scene->uiElements.empty()) continue;	// No `scene->onlyDebug` like above because we till want to have UI even in debug view.
-
-						XrMatrix4x4f matView;		// V
-						if (scene->cameraTransform.expired())
-						{
-							matView = noCameraView;
-						}
-						else
-						{
-							XrMatrix4x4f invView = cnv<XrMatrix4x4f>(scene->cameraTransform.lock()->getGlobalMatrix());
-							XrMatrix4x4f_InvertRigidBody(&matView, &invView);
-						}
-
-						XrMatrix4x4f matProjectionView;	// PV
-						XrMatrix4x4f_Multiply(&matProjectionView, &matProjection, &matView);
-						std::vector<PushConstantData> data(1);
-
-						std::pair<hd::UIElement, hd::ITransform> last = { nullptr, nullptr };
-						for (auto& pair : scene->uiElements)
-						{
-							auto element = pair.first;
-							if (element != last.first)
-							{
-								element->bind(commandBuffers[view]);
-								commandBuffers[view].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayouts.worldPipelineLayout, 1, { element->bitmap->descriptorSet }, { });
-								last.first = element;
+					struct { Bitmap* bitmap; UIElement* ui_element; glm::mat4* model_transform; } last = { nullptr, nullptr, nullptr };
+					for (auto& elements : ui_elements) {
+						for (auto [bitmap, ui_element, model_transform] : *elements) {
+							if (bitmap != last.bitmap) {
+								last.bitmap = bitmap;
+								command_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline_layouts.world_pipeline_layout, 1, { bitmap->descriptor_set }, { });
 							}
-
-							auto transform = pair.second;
-							if (transform != last.second)
-							{
-								auto matTransform = pair.second->getGlobalMatrix();	// M
-								data[0].modelMatrix = matTransform;
-								XrMatrix4x4f_Multiply(&(data[0].projectionView), &matProjectionView, (XrMatrix4x4f*)&matTransform);	// PVM
-								commandBuffers[view].pushConstants<PushConstantData>(pipelineLayouts.worldPipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, data);
+							if (ui_element != last.ui_element) {
+								last.ui_element = ui_element;
+								command_buffer.bindVertexBuffers(0, { ui_element->vertex_buffer }, { vk::DeviceSize(0) });
+								command_buffer.bindIndexBuffer(ui_element->index_buffer, 0, vk::IndexType::eUint32);
 							}
-
-							element->draw(commandBuffers[view]);
+							if (model_transform != last.model_transform) {
+								last.model_transform = model_transform;
+								std::array<PushConstantData, 1> data;
+								data[0].modelMatrix = *model_transform;
+								data[0].projectionView = mat_projection * mat_camera_view * (*model_transform);
+								command_buffer.pushConstants<PushConstantData>(pipeline_layouts.world_pipeline_layout, vk::ShaderStageFlagBits::eVertex, 0, data);
+							}
+							command_buffer.drawIndexed(ui_element->index_count, 1, 0, 0, 0);
 						}
 					}
 					// End Draw.
-				}*/
+				}
 
 				/*if (haveDebug)
 				{
@@ -621,14 +540,14 @@ namespace arx
 				normal_map,
 			};
 		}
-		/*auto create_bitmap(Texture* map) -> Bitmap* {
+		auto create_bitmap(Texture* map) -> Bitmap* {
 			std::array<vk::DescriptorSetLayout, 1> layouts{ descriptor_set_layouts.bitmap_descriptor_set_layout };
-			vk::DescriptorSetAllocateInfo allo_info(descriptorPool, layouts);
+			vk::DescriptorSetAllocateInfo allo_info(descriptor_pool, layouts);
 			auto descriptor_set = device.allocateDescriptorSets(allo_info)[0];
 
 			vk::DescriptorImageInfo map_info{ map->texture_sampler, map->texture_image_view, vk::ImageLayout::eShaderReadOnlyOptimal };
 			std::vector<vk::WriteDescriptorSet> descriptor_writes = {
-				{ descriptor_set, 0, 0, 1, vk::DescriptorType::eCombinedImageSampler, &bitmap_info },
+				{ descriptor_set, 0, 0, 1, vk::DescriptorType::eCombinedImageSampler, &map_info },
 			};
 
 			device.updateDescriptorSets(descriptor_writes, { });
@@ -640,10 +559,10 @@ namespace arx
 		}
 		auto create_bitmap(const std::string& font_path, uint32_t width = 1024, uint32_t height = 1024, float pixelHeight = 150.f) -> Bitmap* {
 			auto font_buffer = readFile(font_path);
-			std::vector<stb::stbi_uc> single_channel_bitmap_data(static_cast<size_t>(width * height));
-			std::vector<stb::stbi_uc> rgba_bitmap_data(static_cast<size_t>(width * height) * 4);
+			std::vector<stbi_uc> single_channel_bitmap_data(static_cast<size_t>(width * height));
+			std::vector<stbi_uc> rgba_bitmap_data(static_cast<size_t>(width * height) * 4);
 			std::array<Bitmap::CharInfo, 128> char_infos;
-			stb::stbtt_BakeFontBitmap((unsigned char*)font_buffer.data(), 0, pixelHeight, single_channel_bitmap_data.data(), width, height, 0, 128, char_infos.data());
+			stbtt_BakeFontBitmap((unsigned char*)font_buffer.data(), 0, pixelHeight, single_channel_bitmap_data.data(), width, height, 0, 128, char_infos.data());
 			for (size_t i = 0; i < single_channel_bitmap_data.size(); ++i)
 			{
 				for (size_t j = 0; j < 4; ++j)
@@ -651,12 +570,14 @@ namespace arx
 					rgba_bitmap_data[4 * i + j] = single_channel_bitmap_data[i];
 				}
 			}
-			bitmap = create_texture(rgba_bitmap_data.data(), static_cast<int32_t>(width), static_cast<int32_t>(height), 4);
-			auto bitmap = create_bitmap(bitmap);
+			auto texture = create_texture(rgba_bitmap_data.data(), static_cast<int32_t>(width), static_cast<int32_t>(height), 4);
+			auto bitmap = create_bitmap(texture);
 			bitmap->char_infos = char_infos;
+			bitmap->height = pixelHeight;
+			bitmap->map_extent = { width, height };
 			return bitmap;
 		}
-		auto create_mesh_model(const std::string& path) -> MeshModel* {
+		/*auto create_mesh_model(const std::string& path) -> MeshModel* {
 			tinyobj::attrib_t attrib;
 			std::vector<tinyobj::shape_t> shapes;
 			std::vector<tinyobj::material_t> materials;
@@ -849,8 +770,8 @@ namespace arx
 				vertex_buffer, vertex_buffer_memory,
 				index_buffer, index_buffer_memory,
 			};
-		}
-		auto create_ui_element(Bitmap* bitmap, std::vector<UIVertex>& vertices, std::vector<uint32_t>& indices) -> UIElement* {
+		}*/
+		auto create_ui_element(std::vector<UIVertex>& vertices, std::vector<uint32_t>& indices) -> UIElement* {
 			// VertexBuffer
 			auto vertex_count = static_cast<uint32_t>(vertices.size());
 			vk::DeviceSize buffer_size = sizeof(UIVertex) * vertex_count;
@@ -886,27 +807,29 @@ namespace arx
 			destroy_buffer(staging_buffer, staging_buffer_memory);
 
 			return new UIElement{
-				bitmap,
 				vertex_count, index_count,
 				vertex_buffer, vertex_buffer_memory,
 				index_buffer, index_buffer_memory,
 			};
 		}
-		auto create_ui_panel(glm::vec2 extent, Texture* texture, glm::vec4 color, glm::vec2 anchor) -> UIElement* {
+		auto create_ui_panel(glm::vec2 extent, glm::vec4 color = { 1.f, 1.f, 1.f, 1.f }, glm::vec2 anchor = { 0.5f, 0.5f }) -> UIElement* {
 			std::vector<UIVertex> vertices = {
 				UIVertex{ extent * (glm::vec2{ 0.f, 0.f } - anchor), { 0.f, 1.f }, color },
 				UIVertex{ extent * (glm::vec2{ 1.f, 0.f } - anchor), { 1.f, 1.f }, color },
 				UIVertex{ extent * (glm::vec2{ 1.f, 1.f } - anchor), { 1.f, 0.f }, color },
 				UIVertex{ extent * (glm::vec2{ 0.f, 1.f } - anchor), { 0.f, 0.f }, color },
 			};
+			for (auto& vertex : vertices) {
+				std::cout << vertex.position.x << ", " << vertex.position.y << std::endl;
+			}
 			std::vector<uint32_t> indices = {
 				0, 1, 2,
 				2, 3, 0,
 			};
-			return create_ui_element(create_bitmap(texture), vertices, indices);
+			return create_ui_element(vertices, indices);
 		}
-		auto create_ui_text(const std::string& text, float height, Bitmap* bitmap, glm::vec4 color, glm::vec2 anchor) -> UIElement* {
-			float scale = height / 150.f;
+		auto create_ui_text(const std::string& text, float height, Bitmap* bitmap, glm::vec4 color = { 0.f, 0.f, 0.f, 1.f }, glm::vec2 anchor = { 0.5f, 0.5f }) -> UIElement* {
+			float scale = height / bitmap->height;
 
 			uint32_t lineCount = 1;
 			glm::vec2 textExtent = { 0.f, height };
@@ -931,7 +854,7 @@ namespace arx
 
 				std::array<UIVertex, 4> charVertices;
 
-				const auto& info = bitmap->charInfos[c];
+				const auto& info = bitmap->char_infos[c];
 				glm::vec2 charExtent{ info.x1 - info.x0, info.y1 - info.y0 };
 
 				charVertices[0].position = currentPoint + scale * glm::vec2(info.xoff, -info.yoff); // top left
@@ -976,9 +899,9 @@ namespace arx
 				vertex.position += offset;
 			}
 
-			return create_ui_element(bitmap, textVertices, indices);
+			return create_ui_element(textVertices, indices);
 		}
-		*/
+		
 	public:
 		VulkanRenderer() {
 			queue_family_index = 0;
@@ -1251,8 +1174,9 @@ namespace arx
 		}
 		auto create_descriptors() -> void {
 			auto material_bindings = Material::get_descriptor_set_layout_bindings();
+			auto bitmap_bindings = Bitmap::get_descriptor_set_layout_bindings();
 			descriptor_set_layouts.material_descriptor_set_layout = device.createDescriptorSetLayout({ { }, material_bindings });
-			//CharacterBitmap::bitmapSetLayout = CharacterBitmap::getDescriptorSetLayout();
+			descriptor_set_layouts.bitmap_descriptor_set_layout = device.createDescriptorSetLayout({ { }, bitmap_bindings });
 			std::array<vk::DescriptorPoolSize, 2> poolSizes = {
 				vk::DescriptorPoolSize{ vk::DescriptorType::eUniformBuffer, 10 },
 				vk::DescriptorPoolSize{ vk::DescriptorType::eCombinedImageSampler, 30 },
@@ -1321,9 +1245,9 @@ namespace arx
 			//auto textVertexAttributeDescriptions = std::vector<vk::VertexInputAttributeDescription>{ };//TextModel::TextVertex::getAttributeDescriptions();
 			//vk::PipelineVertexInputStateCreateInfo textVertexInputInfo{ { }, textVertexBindingDescriptions, textVertexAttributeDescriptions };
 
-			//auto uiVertexBindingDescriptions = std::vector<vk::VertexInputBindingDescription>{ };//UIElement::UIVertex::getBindingDescriptions();
-			//auto uiVertexAttributeDescriptions = std::vector<vk::VertexInputAttributeDescription>{ };//UIElement::UIVertex::getAttributeDescriptions();
-			//vk::PipelineVertexInputStateCreateInfo uiVertexInputInfo{ { }, uiVertexBindingDescriptions, uiVertexAttributeDescriptions };
+			auto uiVertexBindingDescriptions = UIElement::Vertex::get_binding_descriptions();
+			auto uiVertexAttributeDescriptions = UIElement::Vertex::get_attribute_descriptions();
+			vk::PipelineVertexInputStateCreateInfo uiVertexInputInfo{ { }, uiVertexBindingDescriptions, uiVertexAttributeDescriptions };
 
 			vk::PipelineInputAssemblyStateCreateInfo inputAssemblyInfo({}, vk::PrimitiveTopology::eTriangleList, VK_FALSE);
 
@@ -1337,13 +1261,13 @@ namespace arx
 
 			vk::PipelineDepthStencilStateCreateInfo depthStencilInfo({ }, VK_TRUE, VK_TRUE, vk::CompareOp::eLess, VK_FALSE, VK_FALSE);
 
-			vk::PipelineColorBlendAttachmentState colorBlendAttachment{ }; colorBlendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+			vk::PipelineColorBlendAttachmentState colorBlendAttachment{ VK_TRUE, vk::BlendFactor::eSrcAlpha, vk::BlendFactor::eOneMinusSrcAlpha, vk::BlendOp::eAdd, vk::BlendFactor::eOne, vk::BlendFactor::eZero, vk::BlendOp::eAdd, vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA };
 
 			vk::PipelineColorBlendStateCreateInfo colorBlendInfo{ }; colorBlendInfo.attachmentCount = 1; colorBlendInfo.pAttachments = &colorBlendAttachment;
 
-			std::array<vk::DescriptorSetLayout, 1> setLayouts = {
+			std::array<vk::DescriptorSetLayout, 2> setLayouts = {
 				descriptor_set_layouts.material_descriptor_set_layout,
-				//descriptor_set_layouts.bitmap_descriptor_set_layout,
+				descriptor_set_layouts.bitmap_descriptor_set_layout,
 			};
 
 			std::vector<vk::PushConstantRange> pushConstantRanges = {
@@ -1378,15 +1302,15 @@ namespace arx
 			{
 				throw std::runtime_error("Failed to create mesh graphics pipeline.");
 			}
-			pipelines.wireframePipeline = result.value;
+			pipelines.wireframePipeline = result.value;*/
 
-			vk::GraphicsPipelineCreateInfo uiPipelineCreateInfo({ }, uiStageInfos, &uiVertexInputInfo, &inputAssemblyInfo, { }, &viewportInfo, &fillRasterizationInfo, &multisampleInfo, &depthStencilInfo, &colorBlendInfo, &dynamicStateInfo, pipelineLayouts.worldPipelineLayout, renderPass, 0, { }, -1);
+			vk::GraphicsPipelineCreateInfo uiPipelineCreateInfo({ }, uiStageInfos, &uiVertexInputInfo, &inputAssemblyInfo, { }, &viewportInfo, &fillRasterizationInfo, &multisampleInfo, &depthStencilInfo, &colorBlendInfo, &dynamicStateInfo, pipeline_layouts.world_pipeline_layout, render_pass, 0, { }, -1);
 			result = device.createGraphicsPipeline({ }, uiPipelineCreateInfo);
 			if (result.result != vk::Result::eSuccess)
 			{
 				throw std::runtime_error("Failed to create UI graphics pipeline.");
 			}
-			pipelines.uiPipeline = result.value;*/
+			pipelines.ui_pipeline = result.value;
 			log_success();
 
 			device.destroyShaderModule(meshVertShaderModule);
@@ -1416,9 +1340,12 @@ namespace arx
 		}
 		auto create_default_resources() -> void {
 			log_step("Vulkan", "Creating default resources");
-			unsigned char pixels[] = { 0, 0, 0, 0 };
-			defaults.empty_texture = create_texture(pixels, 1, 1, 4);
+			std::array<stbi_uc, 4> pixels = { 0, 0, 0, 0 };
+			defaults.empty_texture = create_texture(pixels.data(), 1, 1, 4);
+			pixels = { 255, 255, 255, 255 };
+			defaults.white_texture = create_texture(pixels.data(), 1, 1, 4);
 			defaults.default_material = create_material(nullptr, nullptr, glm::vec4{ 0.4f, 0.4f, 0.4f, 1.0f });
+			defaults.white_bitmap = create_bitmap(defaults.white_texture);
 			defaults.sample_sphere = create_mesh_model(MeshBuilder::Icosphere(0.2f, 3));
 			log_success();
 		}
@@ -1871,7 +1798,9 @@ namespace arx
 		
 		struct {
 			Texture* empty_texture;
+			Texture* white_texture;
 			Material* default_material;
+			Bitmap* white_bitmap;
 			MeshModel* sample_sphere;
 		} defaults;
 
@@ -1893,10 +1822,10 @@ namespace arx
 		} pipeline_layouts;
 		struct {
 			vk::Pipeline mesh_pipeline;
-			vk::Pipeline textPipeline;
-			vk::Pipeline wireframePipeline;
-			vk::Pipeline uiPipeline;
-			vk::Pipeline shadowPipeline;
+			vk::Pipeline text_pipeline;
+			vk::Pipeline wireframe_pipeline;
+			vk::Pipeline ui_pipeline;
+			vk::Pipeline shadow_pipeline;
 		} pipelines;
 		vk::CommandPool command_pool;
 		vk::CommandBuffer command_buffer;
@@ -1917,5 +1846,6 @@ namespace arx
 
 	public: // Not Owning. Don't try to destroy them.
 		std::unordered_set<std::multiset<std::tuple<Material*, MeshModel*, glm::mat4*>>*> mesh_models;	// What a crazy type :D
+		std::unordered_set<std::multiset<std::tuple<Bitmap*, UIElement*, glm::mat4*>>*> ui_elements;
 	};
 }
