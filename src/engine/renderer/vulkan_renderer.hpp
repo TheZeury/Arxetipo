@@ -819,9 +819,6 @@ namespace arx
 				UIVertex{ extent * (glm::vec2{ 1.f, 1.f } - anchor), { 1.f, 0.f }, color },
 				UIVertex{ extent * (glm::vec2{ 0.f, 1.f } - anchor), { 0.f, 0.f }, color },
 			};
-			for (auto& vertex : vertices) {
-				std::cout << vertex.position.x << ", " << vertex.position.y << std::endl;
-			}
 			std::vector<uint32_t> indices = {
 				0, 1, 2,
 				2, 3, 0,
