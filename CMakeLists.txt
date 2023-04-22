@@ -23,9 +23,11 @@ set (ShaderOutput ${CMAKE_CURRENT_BINARY_DIR}/shaders)
 find_package (Vulkan REQUIRED)
 include_directories (${Vulkan_INCLUDE_DIRS})
 add_subdirectory (external/OpenXR-SDK)
+add_subdirectory (external/PhysX)
 include_directories (external)
 include_directories (external/OpenXR-SDK/include)
 include_directories (external/OpenXR-Hpp/include)
+include_directories (external/PhysX/physx/include)
 include_directories (external/stb)
 
 # Add subdirectories
@@ -37,6 +39,15 @@ add_executable (Arxetipo "src/Arxetipo.cpp" "src/Arxetipo.h")
 target_link_libraries (Arxetipo ArxetipoEngine)
 target_link_libraries (Arxetipo ${Vulkan_LIBRARIES})
 target_link_libraries (Arxetipo openxr_loader)
+target_link_Libraries (Arxetipo 
+	PhysX
+	PhysXCharacterKinematic
+	PhysXCommon
+	PhysXCooking
+	PhysXExtensions
+	PhysXFoundation
+	PhysXVehicle
+)
 
 # Compile shaders
 file(GLOB_RECURSE GLSL_SHADER_FILES 

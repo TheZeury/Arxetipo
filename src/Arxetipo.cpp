@@ -4,9 +4,11 @@
 #include "Arxetipo.h"
 #include "engine/renderer/vulkan_renderer.hpp"
 #include "engine/xr/openxr_plugin.hpp"
+#include "engine/physics/physx_engine.hpp"
 #include "engine/common_objects/common_objects.hpp"
 #include "engine/renderer/graphics_objects.hpp"
 #include "engine/xr/xr_objects.hpp"
+#include "engine/physics/physics_objects.hpp"
 #include "engine/command/command.hpp"
 
 #include <chrono>
@@ -15,8 +17,10 @@ int main() {
 	try {
 		arx::VulkanRenderer renderer;
 		arx::OpenXRPlugin xr_plugin(renderer);
+		arx::PhysXEngine physics_engine;
 		auto proxy = xr_plugin.initialize();
 		renderer.initialize(proxy);
+		physics_engine.initialize();
 		xr_plugin.initialize_session(proxy);
 		renderer.initialize_session(proxy);
 
@@ -29,7 +33,7 @@ int main() {
 		left_controller_transform.set_parent(&camera_offset_transform);
 		right_controller_transform.set_parent(&camera_offset_transform);
 
-		transform.set_local_matrix(glm::translate(glm::mat4{ 1.0f }, glm::vec3{ 0.0f, 1.0f, -2.0f }));
+		transform.set_local_matrix(glm::translate(glm::mat4{ 1.0f }, glm::vec3{ 0.0f, 10.0f, -2.0f }));
 		transform.set_parent(&origin);
 		auto test_sphere = arx::MeshModelComponent{ renderer.defaults.sample_sphere, renderer.defaults.default_material, &transform };
 		test_sphere.register_to_systems(&graphics_system);
@@ -64,6 +68,23 @@ int main() {
 		auto right_cone = arx::MeshModelComponent{ cone_model, renderer.defaults.default_material, &right_controller_transform };
 		right_cone.register_to_systems(&graphics_system);
 		left_cone.register_to_systems(&graphics_system);
+
+		arx::PhysicsSystem physics_system(&physics_engine);
+		auto dynamic = physics_engine.create_rigid_dynamic(
+			transform.get_global_matrix(),
+			physics_engine.create_shape(arx::PhysicsSphereGeometry(0.2f))
+		);
+		auto dynamic_component = arx::RigidDynamicComponent{ dynamic, &transform };
+		dynamic_component.register_to_systems(&physics_system);
+
+		auto static_plane = physics_engine.create_rigid_static(
+			origin.get_global_matrix(),
+			physics_engine.create_shape(arx::PhysicsPlaneGeometry(), glm::rotate(glm::mat4{ 1.f }, 0.5f * glm::pi<float>(), { 0.f, 0.f, 1.f }))
+		);
+		auto plane_component = arx::RigidStaticComponent{ static_plane, &origin };
+		plane_component.register_to_systems(&physics_system);
+
+		physics_system.mobilize();
 
 		arx::CommandRuntime runtime{ std::cin, std::cout };
 		runtime.kernel.add_method("set", [&](const std::vector<arx::CommandValue>& arguments, arx::CommandValue& result) {
@@ -107,7 +128,10 @@ int main() {
 			float time_delta = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - last_time).count();
 			last_time = currentTime;
 
-			origin.set_local_rotation(glm::angleAxis(time_elapsed * glm::pi<float>() / 4.f, glm::vec3{ 0.0f, 1.0f, 0.0f }));
+			physics_system.set_time_delta(time_delta);
+			physics_system.update();
+
+			// origin.set_local_rotation(glm::angleAxis(time_elapsed * glm::pi<float>() / 4.f, glm::vec3{ 0.0f, 1.0f, 0.0f }));
 
 			graphics_system.update();
 		}

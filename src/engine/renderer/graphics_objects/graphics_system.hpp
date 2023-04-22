@@ -46,7 +46,6 @@ namespace arx
 		auto set_camera_offset_transform(SpaceTransform* transform) -> void {
 			camera_offset_transform = transform;
 		}
-
 		auto get_camera_offset_transform() -> SpaceTransform* {
 			return camera_offset_transform;
 		}
