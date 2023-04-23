@@ -11,7 +11,7 @@
 
 #include "scenes/demo_scene.hpp"
 
-int main() {
+auto main() -> int {
 	try {
 		arx::VulkanRenderer renderer;
 		arx::OpenXRPlugin xr_plugin(renderer);
@@ -26,13 +26,13 @@ int main() {
 		scene->mobilize();
 
 		arx::CommandRuntime runtime{ std::cin, std::cout };
-		runtime.kernel.add_method("set", [&](const std::vector<arx::CommandValue>& arguments, arx::CommandValue& result) {
+		runtime.kernel.add_method("teleport", [&](const std::vector<arx::CommandValue>& arguments, arx::CommandValue& result) {
 			if (arguments.size() != 3) {
-				throw arx::CommandException{ "`set` requires 3 arguments." };
+				throw arx::CommandException{ "`teleport` requires 3 arguments. \nHint: `teleport` is used to set xr_offset. \nUsage: `teleport(x, y, z)`" };
 			}
 			for (auto& argument : arguments) {
 				if (argument.type != arx::CommandValue::Type::Number) {
-					throw arx::CommandException{ "coordinates must be numbers." };
+					throw arx::CommandException{ "coordinates must be numbers. \nHint: `teleport` is used to set xr_offset. \nUsage: `teleport(x, y, z)`" };
 				}
 			}
 			scene->entities.xr_offset.set_local_position({ std::get<float>(arguments[0].value), std::get<float>(arguments[1].value), std::get<float>(arguments[2].value) });
@@ -49,6 +49,25 @@ int main() {
 			scene->systems.graphics_system.remove_ui_element(scene->entities.panel.text.ui_element.ui_element, scene->entities.panel.text.ui_element.bitmap, scene->entities.panel.text.ui_element.transform);
 			scene->entities.panel.text.ui_element.ui_element = renderer.create_ui_text(words, 0.05f, scene->resources.font);
 			scene->entities.panel.text.ui_element.register_to_systems(&scene->systems.graphics_system);
+		}, true);
+
+		runtime.kernel.add_method("move", [&](const std::vector<arx::CommandValue>& arguments, arx::CommandValue& result) {
+			if (arguments.size() != 4) {
+				throw arx::CommandException{ "`move` requires 4 arguments. \nHint: `move`, different from `teleport`, is used to move rigid actors. \nUsage: `move(\"name_of_an_object\", x, y, z)`" };
+			}
+			if (arguments[0].type != arx::CommandValue::Type::String) {
+				throw arx::CommandException{ "first argument must be a string as a object's name. \nHint: `move`, different from `teleport`, is used to move rigid actors. \nUsage: `move(\"name_of_an_object\", x, y, z)`" };
+			}
+			for (size_t i = 1; i < arguments.size(); ++i) {
+				if (arguments[i].type != arx::CommandValue::Type::Number) {
+					throw arx::CommandException{ "coordinates must be numbers. \nHint: `move`, different from `teleport`, is used to move rigid actors. \nUsage: `move(\"name_of_an_object\", x, y, z)`" };
+				}
+			}
+			auto name = std::get<std::string>(arguments[0].value);
+			if (name != "test_sphere") {
+				throw arx::CommandException{ "object not found." };
+			}
+			scene->entities.test_sphere.rigid_dynamic.rigid_dynamic->setGlobalPose({ std::get<float>(arguments[1].value), std::get<float>(arguments[2].value), std::get<float>(arguments[3].value) });
 		}, true);
 
 		std::jthread command_thread([&runtime]() {

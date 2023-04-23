@@ -36,14 +36,14 @@ namespace arx
 					},
 				},
 				.panel = {
-					.transform = SpaceTransform{ },
+					.transform = SpaceTransform{ { 0.f, 1.f, -0.3f } },
 					.ui_element = UIElementComponent{ 
 						renderer->create_ui_panel({ 0.3f, 0.1f }), 
 						renderer->defaults.white_bitmap, 
 						&entities.panel.transform 
 					},
 					.text = {
-						.transform = SpaceTransform{ &entities.panel.transform },
+						.transform = SpaceTransform{ { 0.f, 0.f, 0.001f }, &entities.panel.transform },
 						.ui_element = UIElementComponent{
 							renderer->create_ui_text("hello world", 0.05f, resources.font),
 							resources.font,
@@ -61,7 +61,7 @@ namespace arx
 					}
 				},
 				.test_sphere = {
-					.transform = SpaceTransform{ },
+					.transform = SpaceTransform{ { 0.f, 10.f, -2.f } },
 					.mesh_model = MeshModelComponent{ 
 						renderer->defaults.sample_sphere, 
 						renderer->defaults.default_material, 
@@ -77,10 +77,6 @@ namespace arx
 				}
 			}
 		{
-			entities.panel.transform.set_local_position({ 0.f, 1.f, -0.3f });
-			entities.panel.text.transform.set_local_position({ 0.f, 0.f, 0.001f });
-			entities.test_sphere.rigid_dynamic.rigid_dynamic->setGlobalPose(PhysicsTransform(PhysicsVec3{ 0.f, 10.f, -2.f }));
-
 			systems.graphics_system.set_camera_offset_transform(&entities.xr_offset);
 			entities.xr_controllers.left.cone.register_to_systems(&systems.graphics_system);
 			entities.xr_controllers.right.cone.register_to_systems(&systems.graphics_system);

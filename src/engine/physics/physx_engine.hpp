@@ -90,7 +90,7 @@ namespace arx
 
 	struct PhysXEngine
 	{
-	public: // Concept: PhysicsEngine.
+	public: // concept: PhysicsEngine
 		auto initialize() -> void {
 			log_step("PhysX", "Initializing PhysX");
 			foundation = PxCreateFoundation(PX_PHYSICS_VERSION, allocator, errorCallback);
@@ -111,7 +111,7 @@ namespace arx
 			}
 		}
 
-	public: // Concept: PhysicsResourceManager.
+	public: // concept: PhysicsResourceManager
 		auto create_material(float static_friction, float dynamic_friction, float restitution) -> PhysicsMaterial* {
 			return physics->createMaterial(static_friction, dynamic_friction, restitution);
 		}

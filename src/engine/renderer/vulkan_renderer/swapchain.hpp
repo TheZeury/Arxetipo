@@ -38,7 +38,7 @@ namespace arx
 		}
 
 		auto get_render_pass_begin_info(uint32_t image_index) -> vk::RenderPassBeginInfo {
-			std::array<vk::ClearValue, 2> clear_values = {
+			static std::array<vk::ClearValue, 2> clear_values = {
 				vk::ClearValue{ vk::ClearColorValue{ std::array<float, 4>{ 0.3f, 0.4f, 0.7f, 1.f } } },
 				vk::ClearValue{ vk::ClearDepthStencilValue{ 1.f, 0 } },
 			};

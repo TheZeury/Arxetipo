@@ -205,7 +205,56 @@ namespace arx
 	public:
 		SpaceTransform() = default;
 		SpaceTransform(SpaceTransform* parent) : SpaceTransform() {
-			set_parent(parent);
+			if (parent != nullptr) {
+				set_parent(parent);
+			}
+		}
+		SpaceTransform(const glm::vec3& position, const glm::quat& rotation, const glm::vec3& scale, SpaceTransform* parent = nullptr) : SpaceTransform() {
+			set_local_position(position);
+			set_local_rotation(rotation);
+			set_local_scale(scale);
+			if (parent != nullptr) {
+				set_parent(parent);
+			}
+		}
+		SpaceTransform(const glm::mat4& matrix, SpaceTransform* parent = nullptr) : SpaceTransform() {
+			set_local_matrix(matrix);
+			if (parent != nullptr) {
+				set_parent(parent);
+			}
+		}
+		SpaceTransform(const glm::vec3& position, SpaceTransform* parent = nullptr) : SpaceTransform() {
+			set_local_position(position);
+			if (parent != nullptr) {
+				set_parent(parent);
+			}
+		}
+		SpaceTransform(const glm::quat& rotation, SpaceTransform* parent = nullptr) : SpaceTransform() {
+			set_local_rotation(rotation);
+			if (parent != nullptr) {
+				set_parent(parent);
+			}
+		}
+		SpaceTransform(const glm::vec3& position, const glm::vec3& scale, SpaceTransform* parent = nullptr) : SpaceTransform() {
+			set_local_position(position);
+			set_local_scale(scale);
+			if (parent != nullptr) {
+				set_parent(parent);
+			}
+		}
+		SpaceTransform(const glm::vec3& position, const glm::quat& rotation, SpaceTransform* parent = nullptr) : SpaceTransform() {
+			set_local_position(position);
+			set_local_rotation(rotation);
+			if (parent != nullptr) {
+				set_parent(parent);
+			}
+		}
+		SpaceTransform(const glm::quat& rotation, const glm::vec3& scale, SpaceTransform* parent = nullptr) : SpaceTransform() {
+			set_local_rotation(rotation);
+			set_local_scale(scale);
+			if (parent != nullptr) {
+				set_parent(parent);
+			}
 		}
 
 	private:

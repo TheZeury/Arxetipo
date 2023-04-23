@@ -4,7 +4,7 @@ namespace arx
 {
 	struct PhysicsSystem
 	{
-	public: // Concept: System.
+	public: // concept: System
 		template<typename System>
 		requires std::same_as<System, PhysicsSystem>
 		auto get() noexcept -> System* {
