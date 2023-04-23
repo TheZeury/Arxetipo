@@ -150,7 +150,7 @@ namespace arx
 			}
 			return rigid;
 		}
-		auto create_scene() -> physx::PxScene* {
+		auto create_physics_scene() -> physx::PxScene* {
 			physx::PxSceneDesc sceneDesc(physics->getTolerancesScale());
 			{
 				sceneDesc.gravity = PhysicsVec3(0.0f, -9.81f, 0.0f);

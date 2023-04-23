@@ -34,7 +34,7 @@ include_directories (external/stb)
 add_subdirectory ("src")
 
 # Add source to this project's executable.
-add_executable (Arxetipo "src/Arxetipo.cpp" "src/Arxetipo.h")
+add_executable (Arxetipo "src/Arxetipo.cpp" )
 
 target_link_libraries (Arxetipo ArxetipoEngine)
 target_link_libraries (Arxetipo ${Vulkan_LIBRARIES})

@@ -28,7 +28,9 @@ namespace arx
 					physx_engine->simulate(time_delta);
 				}
 				for (auto [rigid_dynamic, transform] : rigid_dynamics) {
-					transform->set_global_matrix(cnv<glm::mat4>(PhysicsMat44(rigid_dynamic->getGlobalPose())));
+					if (rigid_dynamic->isSleeping() == false) {
+						transform->set_global_matrix(cnv<glm::mat4>(PhysicsMat44(rigid_dynamic->getGlobalPose())));
+					}
 				}
 				// Normally rigid statics don't move.
 				// In case they do, it must be managed by this system, so we can update the transform at that time.
@@ -38,7 +40,7 @@ namespace arx
 		
 	public:
 		PhysicsSystem(PhysXEngine* physx_engine) : physx_engine{ physx_engine } {
-			scene = physx_engine->create_scene();
+			scene = physx_engine->create_physics_scene();
 		}
 
 		auto set_time_delta(float time_delta) -> void {

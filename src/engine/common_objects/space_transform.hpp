@@ -202,6 +202,12 @@ namespace arx
 			return children;
 		}
 
+	public:
+		SpaceTransform() = default;
+		SpaceTransform(SpaceTransform* parent) : SpaceTransform() {
+			set_parent(parent);
+		}
+
 	private:
 		auto add_child_internal(SpaceTransform* child) -> void {
 			children.insert(child);
