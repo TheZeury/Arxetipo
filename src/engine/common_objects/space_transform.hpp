@@ -203,6 +203,11 @@ namespace arx
 		}
 
 	public:
+		SpaceTransform(const SpaceTransform&) = delete;
+		SpaceTransform& operator=(const SpaceTransform&) = delete;
+		SpaceTransform(SpaceTransform&&) = delete;
+		SpaceTransform& operator=(SpaceTransform&&) = delete;
+
 		SpaceTransform() = default;
 		SpaceTransform(SpaceTransform* parent) : SpaceTransform() {
 			if (parent != nullptr) {

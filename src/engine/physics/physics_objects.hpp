@@ -3,6 +3,7 @@
 #include "physx_engine.hpp"
 #include "../bricks/game_bricks.hpp"
 #include "../common_objects/common_objects.hpp"
+#include "../renderer/graphics_objects.hpp"
 #include "../helpers/arx_math.hpp"
 
 #include <set>

@@ -36,7 +36,7 @@ namespace arx
 								{
 									entities.xr_controllers.left.point_interactor.generate_trigger_shape(
 										physics_engine,
-										arx::PhysicsSphereGeometry(0.005f),
+										arx::PhysicsSphereGeometry(0.01f),
 										glm::translate(glm::mat4{ 1.f }, { 0.f, -0.05f, 0.f })
 									),
 									entities.xr_controllers.left.grab_interactor.generate_trigger_shape(
@@ -47,6 +47,7 @@ namespace arx
 								}
 							),
 							&entities.xr_controllers.left.transform,
+							true
 						},
 						.association = ActorTransformAssociation{ &entities.xr_controllers.left.rigid_static, &entities.xr_controllers.left.transform },
 					},
@@ -62,7 +63,7 @@ namespace arx
 								{
 									entities.xr_controllers.right.point_interactor.generate_trigger_shape(
 										physics_engine,
-										arx::PhysicsSphereGeometry(0.005f),
+										arx::PhysicsSphereGeometry(0.01f),
 										glm::translate(glm::mat4{ 1.f }, { 0.f, -0.05f, 0.f })
 									),
 									entities.xr_controllers.right.grab_interactor.generate_trigger_shape(
@@ -73,6 +74,7 @@ namespace arx
 								}
 							),
 							&entities.xr_controllers.right.transform,
+							true
 						},
 						.association = ActorTransformAssociation{ &entities.xr_controllers.right.rigid_static, &entities.xr_controllers.right.transform },
 					},
@@ -115,18 +117,22 @@ namespace arx
 							physics_engine->create_shape(arx::PhysicsSphereGeometry(0.2f))
 						),
 						&entities.test_sphere.transform,
+						true
 					},
 					.point_interactable = XRPointInteractable{ &entities.test_sphere.rigid_dynamic },
 					.grab_interactable = XRGrabInteractable{ &entities.test_sphere.rigid_dynamic },
-				}
+				},
 			}
 		{
 			systems.graphics_system.set_camera_offset_transform(&entities.xr_offset);
 			entities.xr_controllers.left.cone.register_to_systems(&systems.graphics_system);
+			entities.xr_controllers.left.rigid_static.register_to_systems(&systems.graphics_system);
 			entities.xr_controllers.right.cone.register_to_systems(&systems.graphics_system);
+			entities.xr_controllers.right.rigid_static.register_to_systems(&systems.graphics_system);
 			entities.panel.ui_element.register_to_systems(&systems.graphics_system);
 			entities.panel.text.ui_element.register_to_systems(&systems.graphics_system);
 			entities.test_sphere.mesh_model.register_to_systems(&systems.graphics_system);
+			entities.test_sphere.rigid_dynamic.register_to_systems(&systems.graphics_system);
 
 			entities.xr_controllers.left.controller.register_to_systems(&systems.xr_system);
 			entities.xr_controllers.left.point_interactor.register_to_systems(&systems.xr_system);

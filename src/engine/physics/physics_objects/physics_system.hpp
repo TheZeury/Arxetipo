@@ -96,6 +96,29 @@ namespace arx
 		std::unordered_map<RigidActor*, SpaceTransform*> associations;
 		PhysicsScene* scene = nullptr;
 		PhysXEngine* physx_engine;
+
+	public:
+		static auto mesh_from_shape(PhysicsShape* shape) -> MeshBuilder {
+			auto& geometry = shape->getGeometry();
+			switch (geometry.getType()) {
+			case PhysicsGeometryType::eBOX: {
+				auto& extents = static_cast<PhysicsBoxGeometry const&>(geometry).halfExtents;
+				return MeshBuilder::Box(extents.x, extents.y, extents.z);
+			}
+			case PhysicsGeometryType::eSPHERE: {
+				auto radius = static_cast<PhysicsSphereGeometry const&>(geometry).radius;
+				return MeshBuilder::Icosphere(radius, 3);
+			}
+			default: {
+				return MeshBuilder();
+			}
+			}
+			return MeshBuilder();
+		}
 	};
 
+	template<typename Systems>
+	concept ContainsPhysicsSystem = requires(Systems systems) {
+		{ systems.template get<PhysicsSystem>() } -> std::convertible_to<PhysicsSystem*>;
+	};
 }

@@ -14,12 +14,15 @@ namespace arx
 			if (!mobilized) {
 				renderer->mesh_models.insert(&mesh_models);
 				renderer->ui_elements.insert(&ui_elements);
+				renderer->debug_mesh_models.insert(&debug_mesh_models);
 				mobilized = true;
 			}
 		}
 		auto freeze() -> void {
 			if (mobilized) {
 				renderer->mesh_models.erase(&mesh_models);
+				renderer->ui_elements.erase(&ui_elements);
+				renderer->debug_mesh_models.erase(&debug_mesh_models);
 				mobilized = false;
 			}
 		}
@@ -39,7 +42,13 @@ namespace arx
 		}
 
 	public:
-		GraphicsSystem(VulkanRenderer* renderer, OpenXRPlugin* xr_plugin = nullptr) : renderer{ renderer }, xr_plugin{ xr_plugin } {
+		GraphicsSystem(VulkanRenderer* renderer, OpenXRPlugin* xr_plugin = nullptr) :
+			renderer{ renderer }, xr_plugin{ xr_plugin },
+			materials{
+				.collider_green = renderer->create_material(nullptr, nullptr, { .2f, .8f, .2f, 1.f }),
+				.trigger_blue = renderer->create_material(nullptr, nullptr, { 0.f, .7f, .9f, 1.f }),
+			}
+		{
 			
 		}
 
@@ -62,6 +71,26 @@ namespace arx
 			auto itr_m = mesh_models.find({ material, model, &(transform->global_matrix) });
 			if (itr_m != mesh_models.end()) {
 				mesh_models.erase(itr_m);
+			}
+			auto itr_t = transforms.find(transform);
+			if (itr_t != transforms.end()) {
+				transforms.erase(itr_t);
+			}
+#endif
+		}
+
+		auto add_debug_mesh_model(MeshModel* model, Material* material, SpaceTransform* transform) -> void {
+			debug_mesh_models.insert({ material, model, &(transform->global_matrix) });
+			transforms.insert(transform);
+		}
+		auto remove_debug_mesh_model(MeshModel* model, Material* material, SpaceTransform* transform) -> void {
+#if defined(NDEBUG)
+			debug_mesh_models.erase(debug_mesh_models.find({ material, model, &(transform->global_matrix) }));
+			transforms.erase(transforms.find(transform));
+#else
+			auto itr_m = debug_mesh_models.find({ material, model, &(transform->global_matrix) });
+			if (itr_m != debug_mesh_models.end()) {
+				debug_mesh_models.erase(itr_m);
 			}
 			auto itr_t = transforms.find(transform);
 			if (itr_t != transforms.end()) {
@@ -95,12 +124,23 @@ namespace arx
 #endif
 		}
 
+		struct {
+			Material* collider_green = nullptr;
+			Material* trigger_blue = nullptr;
+		} materials;
+
 		bool mobilized = false;
 		SpaceTransform* camera_offset_transform = nullptr;
 		std::multiset<std::tuple<Material*, MeshModel*, glm::mat4*>> mesh_models;
 		std::list<std::tuple<Bitmap*, UIElement*, glm::mat4*>> ui_elements;
+		std::multiset<std::tuple<Material*, MeshModel*, glm::mat4*>> debug_mesh_models;
 		std::multiset<SpaceTransform*> transforms;
 		VulkanRenderer* renderer;
 		OpenXRPlugin* xr_plugin;
+	};
+
+	template<typename Systems>
+	concept ContainsGraphicsSystem = requires(Systems systems) {
+		{ systems.template get<GraphicsSystem>() } -> std::convertible_to<GraphicsSystem*>;
 	};
 }

@@ -70,6 +70,28 @@ auto main() -> int {
 			scene->entities.test_sphere.rigid_dynamic.rigid_dynamic->setGlobalPose({ std::get<float>(arguments[1].value), std::get<float>(arguments[2].value), std::get<float>(arguments[3].value) });
 		}, true);
 
+		runtime.kernel.add_method("debug_mode", [&](const std::vector<arx::CommandValue>& arguments, arx::CommandValue& result) {
+			if (arguments.size() != 1) {
+				throw arx::CommandException{ "`debug_mode` requires 1 argument. \nHint: `debug_mode` is used to set debug mode. \nUsage: `debug_mode(\"NoDebug\"/\"OnlyDebug\"/\"Mixed\")`" };
+			}
+			if (arguments[0].type != arx::CommandValue::Type::String) {
+				throw arx::CommandException{ "argument must be a boolean. \nHint: `debug_mode` is used to set debug mode. \nUsage: `debug_mode(\"NoDebug\"/\"OnlyDebug\"/\"Mixed\")`" };
+			}
+			auto debug_mode = std::get<std::string>(arguments[0].value);
+			if (debug_mode == "NoDebug") {
+				renderer.debug_mode = arx::VulkanRenderer::DebugMode::NoDebug;
+			}
+			else if (debug_mode == "OnlyDebug") {
+				renderer.debug_mode = arx::VulkanRenderer::DebugMode::OnlyDebug;
+			}
+			else if (debug_mode == "Mixed") {
+				renderer.debug_mode = arx::VulkanRenderer::DebugMode::Mixed;
+			}
+			else {
+				throw arx::CommandException{ "argument must be \"NoDebug\"/\"OnlyDebug\"/\"Mixed\". \nHint: `debug_mode` is used to set debug mode. \nUsage: `debug_mode(\"NoDebug\"/\"OnlyDebug\"/\"Mixed\")`" };
+			}
+		}, true);
+
 		std::jthread command_thread([&runtime]() {
 			runtime.run();
 		});

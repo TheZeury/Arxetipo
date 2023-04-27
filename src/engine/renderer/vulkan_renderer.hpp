@@ -53,6 +53,12 @@ namespace arx
 			glm::mat4 modelMatrix;
 		};
 
+		enum class DebugMode {
+			NoDebug,
+			OnlyDebug,
+			Mixed,
+		};
+
 		const int MAX_FRAMES_IN_FLIGHT = 2;
 
 	public: // concept: Renderer.
@@ -174,9 +180,9 @@ namespace arx
 				command_buffer.beginRenderPass(swap_chains[view]->get_render_pass_begin_info(image_index), vk::SubpassContents::eInline);		// <======= Render Pass Begin. TODO: use subpasses.
 
 				bool haveText = false;
-				bool haveMesh = !mesh_models.empty();
+				bool haveMesh = (debug_mode != DebugMode::OnlyDebug) && !mesh_models.empty();
 				bool haveUI = !ui_elements.empty();
-				bool haveDebug = false;
+				bool haveDebug = (debug_mode != DebugMode::NoDebug) && !debug_mesh_models.empty();
 
 				glm::mat4 mat_camera_view = glm::inverse(mat_camera_transform);
 
@@ -271,8 +277,6 @@ namespace arx
 							command_buffer.drawIndexed(mesh_model->index_count, 1, 0, 0, 0);
 						}
 					}
-
-
 					// End Draw.
 				}
 
@@ -310,61 +314,39 @@ namespace arx
 					// End Draw.
 				}
 
-				/*if (haveDebug)
+				if (haveDebug)
 				{
-					commandBuffers[view].bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.wireframePipeline);			// <======= Bind Wireframe Pipeline.
+					command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.wireframe_pipeline);			// <======= Bind Mesh Pipeline.
 
-					commandBuffers[view].setViewport(0, 1, swapChains[view]->getViewport());		// <======== Set Viewports.
+					command_buffer.setViewport(0, 1, swap_chains[view]->getViewport());		// <======== Set Viewports.
 
-					commandBuffers[view].setScissor(0, 1, swapChains[view]->getScissor());		// <======== Set Scissors.
+					command_buffer.setScissor(0, 1, swap_chains[view]->getScissor());		// <======== Set Scissors.
 
 					// Draw something.
-					for (auto scene : scenes)
-					{
-						if (!debugOn(scene->debugMode)) continue;
-						scene = scene->debugScene;
-						if (scene == nullptr || scene->models.empty()) continue;
-
-						XrMatrix4x4f matView;		// V
-						if (scene->cameraTransform.expired())
-						{
-							matView = noCameraView;
-						}
-						else
-						{
-							XrMatrix4x4f invView = cnv<XrMatrix4x4f>(scene->cameraTransform.lock()->getGlobalMatrix());
-							XrMatrix4x4f_InvertRigidBody(&matView, &invView);
-						}
-
-						XrMatrix4x4f matProjectionView;	// PV
-						XrMatrix4x4f_Multiply(&matProjectionView, &matProjection, &matView);
-						std::vector<PushConstantData> data(1);
-
-						std::pair<hd::MeshModel, hd::ITransform> last = { nullptr, nullptr };
-						for (auto& pair : scene->models)
-						{
-							auto model = pair.first;
-							if (model != last.first)
-							{
-								model->bind(commandBuffers[view]);
-								commandBuffers[view].bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayouts.worldPipelineLayout, 0, { model->material->descriptorSet }, { });
-								last.first = model;
+					struct { Material* material; MeshModel* mesh_model; glm::mat4* model_transform; } last = { nullptr, nullptr, nullptr };
+					for (auto& models : debug_mesh_models) {
+						for (auto [material, mesh_model, model_transform] : *models) {
+							if (material != last.material) {
+								last.material = material;
+								command_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline_layouts.world_pipeline_layout, 0, { material->descriptor_set }, { });
 							}
-
-							auto transform = pair.second;
-							if (transform != last.second)
-							{
-								auto matTransform = pair.second->getGlobalMatrix();	// M
-								data[0].modelMatrix = matTransform;
-								XrMatrix4x4f_Multiply(&(data[0].projectionView), &matProjectionView, (XrMatrix4x4f*)&matTransform);	// PVM
-								commandBuffers[view].pushConstants<PushConstantData>(pipelineLayouts.worldPipelineLayout, vk::ShaderStageFlagBits::eVertex, 0, data);
+							if (mesh_model != last.mesh_model) {
+								last.mesh_model = mesh_model;
+								command_buffer.bindVertexBuffers(0, { mesh_model->vertex_buffer }, { vk::DeviceSize(0) });
+								command_buffer.bindIndexBuffer(mesh_model->index_buffer, 0, vk::IndexType::eUint32);
 							}
-
-							model->draw(commandBuffers[view]);
+							if (model_transform != last.model_transform) {
+								last.model_transform = model_transform;
+								std::array<PushConstantData, 1> data;
+								data[0].modelMatrix = *model_transform;
+								data[0].projectionView = mat_projection * mat_camera_view * (*model_transform);
+								command_buffer.pushConstants<PushConstantData>(pipeline_layouts.world_pipeline_layout, vk::ShaderStageFlagBits::eVertex, 0, data);
+							}
+							command_buffer.drawIndexed(mesh_model->index_count, 1, 0, 0, 0);
 						}
 					}
 					// End Draw.
-				}*/;
+				}
 
 				command_buffer.endRenderPass();		// <========= Render Pass End.
 			}
@@ -1293,13 +1275,13 @@ namespace arx
 			}
 			pipelines.mesh_pipeline = result.value;
 
-			/*vk::GraphicsPipelineCreateInfo wireframePipelineCreateInfo({ }, meshStageInfos, &meshVertexInputInfo, &inputAssemblyInfo, { }, &viewportInfo, &wireRasterizationInfo, &multisampleInfo, &depthStencilInfo, &colorBlendInfo, &dynamicStateInfo, pipelineLayouts.worldPipelineLayout, renderPass, 0, { }, -1);
+			vk::GraphicsPipelineCreateInfo wireframePipelineCreateInfo({ }, meshStageInfos, &meshVertexInputInfo, &inputAssemblyInfo, { }, &viewportInfo, &wireRasterizationInfo, &multisampleInfo, &depthStencilInfo, &colorBlendInfo, &dynamicStateInfo, pipeline_layouts.world_pipeline_layout, render_pass, 0, { }, -1);
 			result = device.createGraphicsPipeline({ }, wireframePipelineCreateInfo);
 			if (result.result != vk::Result::eSuccess)
 			{
-				throw std::runtime_error("Failed to create mesh graphics pipeline.");
+				throw std::runtime_error("Failed to create wireframe graphics pipeline.");
 			}
-			pipelines.wireframePipeline = result.value;*/
+			pipelines.wireframe_pipeline = result.value;
 
 			vk::GraphicsPipelineCreateInfo uiPipelineCreateInfo({ }, uiStageInfos, &uiVertexInputInfo, &inputAssemblyInfo, { }, &viewportInfo, &fillRasterizationInfo, &multisampleInfo, &depthStencilInfo, &colorBlendInfo, &dynamicStateInfo, pipeline_layouts.world_pipeline_layout, render_pass, 0, { }, -1);
 			result = device.createGraphicsPipeline({ }, uiPipelineCreateInfo);
@@ -1793,6 +1775,7 @@ namespace arx
 			return buffer;
 		}
 		
+		DebugMode debug_mode = DebugMode::Mixed;
 		struct {
 			Texture* empty_texture;
 			Texture* white_texture;
@@ -1844,5 +1827,6 @@ namespace arx
 	public: // Not Owning. Don't try to destroy them.
 		std::unordered_set<std::multiset<std::tuple<Material*, MeshModel*, glm::mat4*>>*> mesh_models;	// What a crazy type :D
 		std::unordered_set<std::list<std::tuple<Bitmap*, UIElement*, glm::mat4*>>*> ui_elements;
+		std::unordered_set<std::multiset<std::tuple<Material*, MeshModel*, glm::mat4*>>*> debug_mesh_models;
 	};
 }
