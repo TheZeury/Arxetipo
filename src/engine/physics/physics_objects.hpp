@@ -10,3 +10,4 @@
 #include "physics_objects/physics_system.hpp"
 #include "physics_objects/rigid_dynamic_component.hpp"
 #include "physics_objects/rigid_static_component.hpp"
+#include "physics_objects/actor_transform_association.hpp"

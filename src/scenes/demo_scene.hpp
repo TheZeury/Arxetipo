@@ -28,11 +28,53 @@ namespace arx
 						.transform = SpaceTransform{ &entities.xr_offset },
 						.controller = XRController{ 0, &entities.xr_controllers.left.transform },
 						.cone = MeshModelComponent{ resources.cone_model, renderer->defaults.default_material, &entities.xr_controllers.left.transform },
+						.point_interactor = XRPointInteractor{ &entities.xr_controllers.left.controller },
+						.grab_interactor = XRGrabInteractor { &entities.xr_controllers.left.controller },
+						.rigid_static = RigidStaticComponent {
+							physics_engine->create_rigid_static(
+								entities.xr_controllers.left.transform.get_global_matrix(),
+								{
+									entities.xr_controllers.left.point_interactor.generate_trigger_shape(
+										physics_engine,
+										arx::PhysicsSphereGeometry(0.005f),
+										glm::translate(glm::mat4{ 1.f }, { 0.f, -0.05f, 0.f })
+									),
+									entities.xr_controllers.left.grab_interactor.generate_trigger_shape(
+										physics_engine,
+										arx::PhysicsSphereGeometry(0.05f),
+										glm::mat4{ 1.f }
+									),
+								}
+							),
+							&entities.xr_controllers.left.transform,
+						},
+						.association = ActorTransformAssociation{ &entities.xr_controllers.left.rigid_static, &entities.xr_controllers.left.transform },
 					},
 					.right = {
 						.transform = SpaceTransform{ &entities.xr_offset },
 						.controller = XRController{ 1, &entities.xr_controllers.right.transform },
 						.cone = MeshModelComponent{ resources.cone_model, renderer->defaults.default_material, &entities.xr_controllers.right.transform },
+						.point_interactor = XRPointInteractor{ &entities.xr_controllers.right.controller },
+						.grab_interactor = XRGrabInteractor { &entities.xr_controllers.right.controller },
+						.rigid_static = RigidStaticComponent {
+							physics_engine->create_rigid_static(
+								entities.xr_controllers.right.transform.get_global_matrix(),
+								{
+									entities.xr_controllers.right.point_interactor.generate_trigger_shape(
+										physics_engine,
+										arx::PhysicsSphereGeometry(0.005f),
+										glm::translate(glm::mat4{ 1.f }, { 0.f, -0.05f, 0.f })
+									),
+									entities.xr_controllers.right.grab_interactor.generate_trigger_shape(
+										physics_engine,
+										arx::PhysicsSphereGeometry(0.05f),
+										glm::mat4{ 1.f }
+									),
+								}
+							),
+							&entities.xr_controllers.right.transform,
+						},
+						.association = ActorTransformAssociation{ &entities.xr_controllers.right.rigid_static, &entities.xr_controllers.right.transform },
 					},
 				},
 				.panel = {
@@ -73,7 +115,9 @@ namespace arx
 							physics_engine->create_shape(arx::PhysicsSphereGeometry(0.2f))
 						),
 						&entities.test_sphere.transform,
-					}
+					},
+					.point_interactable = XRPointInteractable{ &entities.test_sphere.rigid_dynamic },
+					.grab_interactable = XRGrabInteractable{ &entities.test_sphere.rigid_dynamic },
 				}
 			}
 		{
@@ -85,10 +129,33 @@ namespace arx
 			entities.test_sphere.mesh_model.register_to_systems(&systems.graphics_system);
 
 			entities.xr_controllers.left.controller.register_to_systems(&systems.xr_system);
+			entities.xr_controllers.left.point_interactor.register_to_systems(&systems.xr_system);
+			entities.xr_controllers.left.grab_interactor.register_to_systems(&systems.xr_system);
 			entities.xr_controllers.right.controller.register_to_systems(&systems.xr_system);
+			entities.xr_controllers.right.point_interactor.register_to_systems(&systems.xr_system);
+			entities.xr_controllers.right.grab_interactor.register_to_systems(&systems.xr_system);
+			entities.test_sphere.point_interactable.register_to_systems(&systems.xr_system);
+			entities.test_sphere.grab_interactable.register_to_systems(&systems.xr_system);
 
+			entities.xr_controllers.left.rigid_static.register_to_systems(&systems.physics_system);
+			entities.xr_controllers.left.association.register_to_systems(&systems.physics_system);
+			entities.xr_controllers.right.rigid_static.register_to_systems(&systems.physics_system);
+			entities.xr_controllers.right.association.register_to_systems(&systems.physics_system);
 			entities.plane.rigid_static.register_to_systems(&systems.physics_system);
 			entities.test_sphere.rigid_dynamic.register_to_systems(&systems.physics_system);
+
+			entities.test_sphere.point_interactable.on_enter = []() {
+				log_info("Test", "enter", 0);
+			};
+			entities.test_sphere.point_interactable.on_exit = []() {
+				log_info("Test", "exit", 0);
+			};
+			entities.test_sphere.point_interactable.on_select = []() {
+				log_info("Test", "select", 0);
+			};
+			entities.test_sphere.point_interactable.on_deselect = []() {
+				log_info("Test", "deselect", 0);
+			};
 		}
 
 		auto mobilize() -> void {
@@ -122,11 +189,19 @@ namespace arx
 					SpaceTransform transform;
 					XRController controller;
 					MeshModelComponent cone;
+					XRPointInteractor point_interactor;
+					XRGrabInteractor grab_interactor;
+					RigidStaticComponent rigid_static;
+					ActorTransformAssociation association;
 				} left;
 				struct {
 					SpaceTransform transform;
 					XRController controller;
 					MeshModelComponent cone;
+					XRPointInteractor point_interactor;
+					XRGrabInteractor grab_interactor;
+					RigidStaticComponent rigid_static;
+					ActorTransformAssociation association;
 				} right;
 			} xr_controllers;
 			struct {
@@ -144,6 +219,8 @@ namespace arx
 				SpaceTransform transform;
 				MeshModelComponent mesh_model;
 				RigidDynamicComponent rigid_dynamic;
+				XRPointInteractable point_interactable;
+				XRGrabInteractable grab_interactable;
 			} test_sphere;
 		} entities;
 	};

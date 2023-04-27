@@ -4,6 +4,16 @@ namespace arx
 {
 	struct PhysicsSystem
 	{
+	public:
+		struct SimulationFilterBits {
+			enum Enum: physx::PxU32 {
+				World = 1 << 0,
+				UI = 1 << 1,
+				XRPointable = 1 << 2,
+				XRGrabable = 1 << 3,
+			};
+		};
+
 	public: // concept: System
 		template<typename System>
 		requires std::same_as<System, PhysicsSystem>
@@ -24,6 +34,9 @@ namespace arx
 		}
 		auto update() -> void {
 			if (mobilized) {
+				for (auto [actor, transform] : associations) {
+					actor->setGlobalPose(PhysicsTransform(cnv<PhysicsMat44>(transform->get_global_matrix())));
+				}
 				if (physx_engine != nullptr) {
 					physx_engine->simulate(time_delta);
 				}
@@ -68,11 +81,19 @@ namespace arx
 			scene->removeActor(*rigid_static);
 		}
 
+		auto add_association(RigidActor* actor, SpaceTransform* transform) -> void {
+			associations.insert({ actor, transform });
+		}
+		auto remove_association(RigidActor* actor) -> void {
+			associations.erase(associations.find(actor));
+		}
+
 	public:
 		bool mobilized = false;
 		float time_delta = 0.02f;
 		std::multiset<std::tuple<RigidStatic*, SpaceTransform*>> rigid_statics;
 		std::multiset<std::tuple<RigidDynamic*, SpaceTransform*>> rigid_dynamics;
+		std::unordered_map<RigidActor*, SpaceTransform*> associations;
 		PhysicsScene* scene = nullptr;
 		PhysXEngine* physx_engine;
 	};

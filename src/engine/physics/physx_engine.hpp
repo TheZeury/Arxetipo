@@ -65,13 +65,6 @@ namespace arx
 		physx::PxFilterObjectAttributes attributes1, physx::PxFilterData filterData1,
 		physx::PxPairFlags& pairFlags, const void* constantBlock, physx::PxU32 constantBlockSize)
 	{
-		// Let triggers through.
-		if (physx::PxFilterObjectIsTrigger(attributes0) || physx::PxFilterObjectIsTrigger(attributes1))
-		{
-			pairFlags = physx::PxPairFlag::eTRIGGER_DEFAULT;
-			return physx::PxFilterFlag::eDEFAULT;
-		}
-
 		// Filter test.
 		// word0: mask.
 		// word1: bits to filter out if counter's mask contains any.
@@ -79,9 +72,13 @@ namespace arx
 		// word3: friend mask, ignore word0, word1 and word2 as long as two friend masks overlap.
 		if (!(filterData0.word3 & filterData0.word3) && (
 			(filterData0.word1 & filterData1.word0) || (filterData1.word1 & filterData0.word0) ||
-			(filterData0.word2 & filterData1.word0 ^ filterData0.word2) || (filterData1.word2 & filterData0.word0 ^ filterData1.word2)))
-		{
+			(filterData0.word2 & filterData1.word0 ^ filterData0.word2) || (filterData1.word2 & filterData0.word0 ^ filterData1.word2))) {
 			return physx::PxFilterFlag::eKILL;
+		}
+
+		if (physx::PxFilterObjectIsTrigger(attributes0) || physx::PxFilterObjectIsTrigger(attributes1)) {
+			pairFlags = physx::PxPairFlag::eTRIGGER_DEFAULT;
+			return physx::PxFilterFlag::eDEFAULT;
 		}
 
 		pairFlags = physx::PxPairFlag::eCONTACT_DEFAULT;

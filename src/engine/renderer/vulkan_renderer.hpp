@@ -1843,6 +1843,6 @@ namespace arx
 
 	public: // Not Owning. Don't try to destroy them.
 		std::unordered_set<std::multiset<std::tuple<Material*, MeshModel*, glm::mat4*>>*> mesh_models;	// What a crazy type :D
-		std::unordered_set<std::multiset<std::tuple<Bitmap*, UIElement*, glm::mat4*>>*> ui_elements;
+		std::unordered_set<std::list<std::tuple<Bitmap*, UIElement*, glm::mat4*>>*> ui_elements;
 	};
 }

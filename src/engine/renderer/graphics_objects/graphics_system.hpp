@@ -71,12 +71,17 @@ namespace arx
 		}
 
 		auto add_ui_element(UIElement* element, Bitmap* bitmap, SpaceTransform* transform) -> void {
-			ui_elements.insert({ bitmap, element, &(transform->global_matrix) });
+			ui_elements.push_back({ bitmap, element, &(transform->global_matrix) });
 			transforms.insert(transform);
 		}
 		auto remove_ui_element(UIElement* element, Bitmap* bitmap, SpaceTransform* transform) -> void {
 #if defined(NDEBUG)
-			ui_elements.erase(ui_elements.find({ bitmap, element, &(transform->global_matrix) }));
+			for (auto itr = ui_elements.begin(); itr != ui_elements.end(); ++itr) { // TODO: to be optimized.
+				if (*itr == std::tuple{ bitmap, element, &(transform->global_matrix) }) {
+					ui_elements.erase(itr);
+					break;
+				}
+			}
 			transforms.erase(transforms.find(transform));
 #else
 			auto itr_u = ui_elements.find({ bitmap, element, &(transform->global_matrix) });
@@ -93,7 +98,7 @@ namespace arx
 		bool mobilized = false;
 		SpaceTransform* camera_offset_transform = nullptr;
 		std::multiset<std::tuple<Material*, MeshModel*, glm::mat4*>> mesh_models;
-		std::multiset<std::tuple<Bitmap*, UIElement*, glm::mat4*>> ui_elements;
+		std::list<std::tuple<Bitmap*, UIElement*, glm::mat4*>> ui_elements;
 		std::multiset<SpaceTransform*> transforms;
 		VulkanRenderer* renderer;
 		OpenXRPlugin* xr_plugin;

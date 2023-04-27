@@ -4,6 +4,11 @@ namespace arx
 {
 	struct XRSystem
 	{
+	public:
+		struct Interactor {
+			virtual auto pass_actions() -> void = 0;
+		};
+
 	public: // concept: System
 		template<typename System>
 		requires std::same_as<System, XRSystem>
@@ -20,6 +25,9 @@ namespace arx
 				transform->set_local_position(cnv<glm::vec3>(xr_plugin->input_state.handLocations[controller_id].pose.position));
 				transform->set_local_rotation(cnv<glm::quat>(xr_plugin->input_state.handLocations[controller_id].pose.orientation));
 			}
+			for (auto interactor : interactors) {
+				interactor->pass_actions();
+			}
 		}
 
 	public:
@@ -33,6 +41,16 @@ namespace arx
 			controllers.erase(controllers.find({ controller_id, nullptr }));
 		}
 
+		auto add_interactor(Interactor* interactor) -> void {
+			interactors.insert(interactor);
+		}
+		auto remove_interactor(Interactor* interactor) -> void {
+			interactors.erase(interactor);
+		}
+
+		std::unordered_set<Interactor*> interactors;
+		std::unordered_map<PhysicsActor*, void*> point_interactables;
+		std::unordered_map<PhysicsActor*, void*> grab_interactables;
 		std::multiset<std::tuple<uint32_t, SpaceTransform*>> controllers;
 		OpenXRPlugin* xr_plugin;
 	};
