@@ -1,0 +1,9 @@
+[book]
+authors = ["Zeury"]
+language = "en"
+multilingual = false
+src = ""
+title = "Arxetipo Beginner Guide"
+
+[build]
+build-dir = "../../beginner-guide"
