@@ -118,7 +118,5 @@ namespace arx
 	};
 
 	template<typename Systems>
-	concept ContainsPhysicsSystem = requires(Systems systems) {
-		{ systems.template get<PhysicsSystem>() } -> std::convertible_to<PhysicsSystem*>;
-	};
+	concept ContainsPhysicsSystem = Contains<Systems, PhysicsSystem>;
 }

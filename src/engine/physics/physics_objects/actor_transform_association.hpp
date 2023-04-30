@@ -7,8 +7,10 @@ namespace arx
 	public:
 		template<typename Systems>
 		auto register_to_systems(Systems* systems) -> void {
-			physics_system = systems->get<PhysicsSystem>();
-			physics_system->add_association(actor, transform);
+			if constexpr (ContainsPhysicsSystem<Systems>) {
+				physics_system = systems->get<PhysicsSystem>();
+				physics_system->add_association(actor, transform);
+			}
 		}
 
 	public:

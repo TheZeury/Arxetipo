@@ -7,22 +7,24 @@ namespace arx
 	public:
 		template<typename Systems>
 		auto register_to_systems(Systems* systems) -> void {
-			xr_system = systems->get<XRSystem>();
+			if constexpr (ContainsXRSystem<Systems>) {
+				xr_system = systems->get<XRSystem>();
 
-			uint32_t shape_count = actor->getNbShapes();
-			std::vector<PhysicsShape*> shapes(shape_count);
-			actor->getShapes(shapes.data(), shape_count);
-			for (auto shape : shapes) {
-				auto filter_data = shape->getSimulationFilterData();
-				shape->setSimulationFilterData({
-					filter_data.word0 | PhysicsSystem::SimulationFilterBits::XRGrabable,
-					filter_data.word1,
-					filter_data.word2,
-					filter_data.word3,
-				});
+				uint32_t shape_count = actor->getNbShapes();
+				std::vector<PhysicsShape*> shapes(shape_count);
+				actor->getShapes(shapes.data(), shape_count);
+				for (auto shape : shapes) {
+					auto filter_data = shape->getSimulationFilterData();
+					shape->setSimulationFilterData({
+						filter_data.word0 | PhysicsSystem::SimulationFilterBits::XRGrabable,
+						filter_data.word1,
+						filter_data.word2,
+						filter_data.word3,
+						});
+				}
+
+				xr_system->grab_interactables.insert({ static_cast<PhysicsActor*>(actor), static_cast<XRGrabInteractor::Interactable*>(this) });
 			}
-
-			xr_system->grab_interactables.insert({ static_cast<PhysicsActor*>(actor), static_cast<XRGrabInteractor::Interactable*>(this) });
 		}
 
 	public:

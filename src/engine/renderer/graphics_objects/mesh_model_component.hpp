@@ -7,7 +7,9 @@ namespace arx
 	public:
 		template<typename Systems>
 		auto register_to_systems(Systems* systems) -> void {
-			systems->get<GraphicsSystem>()->add_mesh_model(model, material, transform);
+			if constexpr (ContainsGraphicsSystem<Systems>) {
+				systems->get<GraphicsSystem>()->add_mesh_model(model, material, transform);
+			}
 		}
 	public:
 		MeshModel* model;

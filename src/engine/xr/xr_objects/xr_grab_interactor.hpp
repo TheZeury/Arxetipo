@@ -77,8 +77,10 @@ namespace arx
 	public:
 		template<typename Systems>
 		auto register_to_systems(Systems* systems) -> void {
-			xr_system = systems->get<XRSystem>();
-			xr_system->add_interactor(this);
+			if constexpr (ContainsXRSystem<Systems>) {
+				xr_system = systems->get<XRSystem>();
+				xr_system->add_interactor(this);
+			}
 		}
 
 	public:

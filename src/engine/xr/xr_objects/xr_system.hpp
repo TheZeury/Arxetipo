@@ -54,4 +54,7 @@ namespace arx
 		std::multiset<std::tuple<uint32_t, SpaceTransform*>> controllers;
 		OpenXRPlugin* xr_plugin;
 	};
+
+	template<typename Systems>
+	concept ContainsXRSystem = Contains<Systems, XRSystem>;
 }

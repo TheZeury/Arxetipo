@@ -7,7 +7,9 @@ namespace arx
 	public:
 		template<typename Systems>
 		auto register_to_systems(Systems* systems) -> void {
-			systems->get<GraphicsSystem>()->add_ui_element(ui_element, bitmap, transform);
+			if constexpr (ContainsGraphicsSystem<Systems>) {
+				systems->get<GraphicsSystem>()->add_ui_element(ui_element, bitmap, transform);
+			}
 		}
 
 	public:

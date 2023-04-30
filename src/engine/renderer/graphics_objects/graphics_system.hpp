@@ -140,7 +140,5 @@ namespace arx
 	};
 
 	template<typename Systems>
-	concept ContainsGraphicsSystem = requires(Systems systems) {
-		{ systems.template get<GraphicsSystem>() } -> std::convertible_to<GraphicsSystem*>;
-	};
+	concept ContainsGraphicsSystem = Contains<Systems, GraphicsSystem>;
 }

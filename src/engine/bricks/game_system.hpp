@@ -9,6 +9,11 @@ namespace arx
 		s.update();
 	};
 
+	template<typename SystemContainer, typename SystemName>
+	concept Contains = requires(SystemContainer systems) {
+		{ systems.template get<SystemName>() } -> std::convertible_to<SystemName*>;
+	};
+
 	template<typename... types>
 	struct StaticSystemComposition;
 

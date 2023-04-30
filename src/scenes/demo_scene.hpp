@@ -150,7 +150,7 @@ namespace arx
 			entities.plane.rigid_static.register_to_systems(&systems.physics_system);
 			entities.test_sphere.rigid_dynamic.register_to_systems(&systems.physics_system);
 
-			entities.test_sphere.point_interactable.on_enter = []() {
+			/*entities.test_sphere.point_interactable.on_enter = []() {
 				log_info("Test", "enter", 0);
 			};
 			entities.test_sphere.point_interactable.on_exit = []() {
@@ -161,7 +161,7 @@ namespace arx
 			};
 			entities.test_sphere.point_interactable.on_deselect = []() {
 				log_info("Test", "deselect", 0);
-			};
+			};*/
 		}
 
 		auto mobilize() -> void {
