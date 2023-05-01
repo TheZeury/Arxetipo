@@ -84,7 +84,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded affix "><a href="introduction.html">Introduction</a></li><li class="chapter-item expanded "><a href="foundations-systems-and-components.html"><strong aria-hidden="true">1.</strong> Foundations, Systems and Components</a></li><li class="chapter-item expanded "><a href="renderer.html"><strong aria-hidden="true">2.</strong> Renderer</a></li><li class="spacer"></li><li class="chapter-item expanded affix "><a href="beginner-guide-redirect.html">Beginner Guide</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="introduction.html">Introduction</a></li><li class="chapter-item expanded "><a href="foundations-and-objects.html"><strong aria-hidden="true">1.</strong> Foundations, Systems and Components</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="foundations-and-objects/foundation.html"><strong aria-hidden="true">1.1.</strong> Foundations</a></li><li class="chapter-item expanded "><a href="foundations-and-objects/system.html"><strong aria-hidden="true">1.2.</strong> Systems</a></li><li class="chapter-item expanded "><a href="foundations-and-objects/component.html"><strong aria-hidden="true">1.3.</strong> Components</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.</strong> XR Plugin</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">3.</strong> Renderer</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">4.</strong> Physics Engine</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.</strong> Command Runtime</div></li><li class="spacer"></li><li class="chapter-item expanded affix "><a href="beginner-guide-redirect.html">Beginner Guide</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -146,8 +146,262 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="foundations-systems-and-components"><a class="header" href="#foundations-systems-and-components">Foundations, Systems and Components</a></h1>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="renderer"><a class="header" href="#renderer">Renderer</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="foundations-and-objects"><a class="header" href="#foundations-and-objects">Foundations and Objects</a></h1>
+<h2 id="overview"><a class="header" href="#overview">Overview</a></h2>
+<p>Arxetipo follows a structured approach to game development, comprising of foundations, systems, and components.</p>
+<ul>
+<li>
+<p><strong>Foundation</strong>: First abstraction layers of low-level APIs, complex codes, and third-party libraries. Examples include the Vulkan-based renderer, OpenXR-based XR plugin, and PhysX-based physics engine.</p>
+</li>
+<li>
+<p><strong>System</strong>: Managers of related game logics, and can be based on foundations and other systems. </p>
+</li>
+<li>
+<p><strong>Component</strong>: Small pieces of game logics that require to be <em>registered</em> to one or more systems to function.</p>
+</li>
+</ul>
+<p>Together, systems and components are called <strong>Object</strong>.</p>
+<h2 id="others"><a class="header" href="#others">Others</a></h2>
+<p>In addition to systems and components, there are other items that cannot be categorized under any of them, such as the materials of the renderer and the physics shapes of the physics engine. While these may fall under the general definition of computer programming &quot;objects,&quot; Arxetipo does not consider them as such.</p>
+<h2 id="no-entities"><a class="header" href="#no-entities">No Entities</a></h2>
+<p>Unlike typical ECS frameworks, Arxetipo does not include a specific &quot;entity&quot; object. 
+While the concept of entities is to group components together, a dedicated object is not necessary for this. 
+One can have a collection of components in any way they see fit, such as a struct, a std::vector, or even just several components surrounded by comments to indicate that they belong together. 
+It is up to the developers to decide whether they want to call this an &quot;entity.&quot;</p>
+<p>Arxetipo does, however, provide a way to group components together called <strong>Component Composition</strong>. It is still not the same as an &quot;entity.&quot; See more at the <a href="../component-composition/README.html">Component Composition</a> page.</p>
+<h2 id="implementation-based"><a class="header" href="#implementation-based">Implementation-based</a></h2>
+<p>It's worth noting that the implementation of Arxetipo is convention-based, rather than inheritance-based. There are no base classes for foundations or objects. While this convention can be broken, it may be difficult to connect the code with other parts of Arxetipo. For example, components that do not follow the convention may not fit into component compositions.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="foundations"><a class="header" href="#foundations">Foundations</a></h1>
+<p><strong>Foundation</strong> are the first abstraction layers of low-level APIs, complex codes, and third-party libraries.</p>
+<h2 id="suggested-coventions"><a class="header" href="#suggested-coventions">Suggested Coventions</a></h2>
+<p>There are no generic requirements for a foundation since the way they work varies, as they are based on different low-level and third-party APIs. 
+However, there are some conventions that are suggested to be followed:</p>
+<h3 id="1-providing-common-interfaces"><a class="header" href="#1-providing-common-interfaces">1. Providing Common Interfaces</a></h3>
+<p>This is mainly for modularity to ensure the possibility to replace a foundation with another implementation without or only with minimal changes in the other codes.</p>
+<p>For example, a renderer should provide a common interface to create models, render frames, and so on. 
+By providing the same interface, you can write your own renderer and replace the default one with it.</p>
+<h3 id="2-using-proxies-to-resolve-dependencies"><a class="header" href="#2-using-proxies-to-resolve-dependencies">2. Using Proxies to Resolve Dependencies</a></h3>
+<p>Foundations can have dependencies, such as renderers and xr plugins always depending on each other. 
+By extracting the communication between them to a proxy and providing interfaces with that proxy, one foundation can be replaced without changing the other one.</p>
+<h2 id="engine-implemented-foundations"><a class="header" href="#engine-implemented-foundations">Engine implemented Foundations</a></h2>
+<p>Arxeitpo provides some common used foundations. 
+They are sufficient for most use cases, so you typically don't need to write your own.</p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Description</th></tr></thead><tbody>
+<tr><td><a href="foundations-and-objects/">VulkanRenderer</a></td><td>A Vulkan based renderer.</td></tr>
+<tr><td><a href="foundations-and-objects/">OpenXRPlugin</a></td><td>An OpenXR based XR plugin.</td></tr>
+<tr><td><a href="foundations-and-objects/">PhysXEngine</a></td><td>A PhysX based physics engine.</td></tr>
+<tr><td><a href="foundations-and-objects/">CommandRuntime</a></td><td>A command runtime excuting commands written in &quot;Arxemando&quot;</td></tr>
+</tbody></table>
+</div><div style="break-before: page; page-break-before: always;"></div><h1 id="systems"><a class="header" href="#systems">Systems</a></h1>
+<p>Systems are managers of related game logics, and can be based on foundations and other systems. </p>
+<h2 id="interfaces-aka-concept"><a class="header" href="#interfaces-aka-concept">Interfaces (aka. Concept)</a></h2>
+<p>By convention a system type is a type that implements the following member functions:</p>
+<pre><code class="language-cpp">auto mobilize() -&gt; void;
+auto freeze() -&gt; void;
+auto update() -&gt; void;
+
+template&lt;typename System&gt;
+requires /*...*/
+auto get() -&gt; System*;
+
+template&lt;typename System&gt;
+auto contains() -&gt; bool;
+</code></pre>
+<p>The <code>get</code> and <code>contains</code> function can be useful when extracting a particular system from a <a href="foundations-and-objects/system.html#system-composition"><strong>System Composition</strong></a>. 
+For a single system which you would most likely write, it should be implemented as follows:</p>
+<pre><code class="language-cpp">struct MySystem {
+	// ... 
+
+	template&lt;typename System&gt;
+	requires std::same_as&lt;System, MySystem&gt;
+	auto get() noexcept -&gt; System* {
+		return this;
+	}
+
+	template&lt;typename System&gt;
+	constexpr auto contains() -&gt; bool {
+		return std::same_as&lt;System, MySystem&gt;;
+	}
+};
+</code></pre>
+<h2 id="system-composition"><a class="header" href="#system-composition">System Composition</a></h2>
+<p>A system composition is a type that contains a collection of systems. 
+It is also a system itself as it implements the same interface as a system. </p>
+<p>Arxetipo implements are two kinds of system compositions: <strong>Static System Composition</strong> and <strong>Dynamic System Composition</strong>.</p>
+<p>regradless of which kind a system composition is, it behaves as:</p>
+<ul>
+<li>call the <code>mobilize</code> functions of all systems it contains when <code>mobilize</code> is called.</li>
+<li>call the <code>freeze</code> functions of all systems it contains when <code>freeze</code> is called.</li>
+<li>call the <code>update</code> functions of all systems it contains when <code>update</code> is called.</li>
+<li>return a pointer to the required system when <code>get</code> is called.</li>
+</ul>
+<p>The most common use case is to pass a System Composition which contains all required systems when registering a component to systems using its member function <code>register_to_systems</code>. 
+See more: <a href="foundations-and-objects/component.html#register_to_systems">Component</a>.</p>
+<p>On the other hand, <code>mobilize</code>, <code>freeze</code> and <code>update</code> functions of a system composition are not commonly used, as the exact point at which they should be called varies from system to system. 
+But they can still be useful when some systems are truely highly associated.</p>
+<p>Both static system composition and dynamic system composition excute underlying systems in the order they are added. 
+You can write your own system composition in the way you would like it to be.</p>
+<h3 id="static-system-composition"><a class="header" href="#static-system-composition">Static System Composition</a></h3>
+<pre><code class="language-cpp">template&lt;typename... Types&gt;
+struct StaticSystemComposition;
+</code></pre>
+<p>A static system composition is a system composition which types of systems it contains are known at compile time. 
+Removing or adding a new system to a static system after initializion <strong>IS NOT</strong> possible.</p>
+<h4 id="usage"><a class="header" href="#usage">Usage</a></h4>
+<pre><code class="language-cpp">StaticSystemCompostion&lt;GraphicsSystem, XRSystem, PhysicsSystem&gt; systems{ { }, { }, { } };
+
+RigidDynamicComponent ball{ /*...*/ }; // A component that can be registered to both GraphicsSystem and PhysicsSystem.
+
+ball.register_to_systems(systems);
+</code></pre>
+<h4 id="get"><a class="header" href="#get"><code>get</code></a></h4>
+<pre><code class="language-cpp">template&lt;typename System&gt;
+requires (std::same_as&lt;System, Types&gt; || ...)
+auto get() noexcept -&gt; System*;
+</code></pre>
+<p>Any system type that is not contained in the static system composition will cause a compile error.</p>
+<p>The exact signature is different from above because of the implementation, but they work the same.</p>
+<h4 id="contains"><a class="header" href="#contains"><code>contains</code></a></h4>
+<pre><code class="language-cpp">template&lt;typename System&gt;
+constexpr auto contains() -&gt; bool {
+	return std::same_as&lt;System, Types&gt; || ...;
+}
+</code></pre>
+<p>A constexpr function that is evaluated at compile time.</p>
+<h3 id="dynamic-system-composition"><a class="header" href="#dynamic-system-composition">Dynamic System Composition</a></h3>
+<pre><code>struct DynamicSystemComposition;
+</code></pre>
+<p>A dynamic system composition is a system composition which types of systems it contains are known at runtime. 
+Removing or adding a new system to a dynamic system after initializion <strong>IS</strong> possible.</p>
+<h4 id="usage-1"><a class="header" href="#usage-1">Usage</a></h4>
+<pre><code class="language-cpp">DynamicSystemComposition systems;
+systems.add&lt;GraphicsSystem&gt;();
+systems.add&lt;XRSystem&gt;();
+systems.add&lt;PhysicsSystem&gt;();
+systems.remove&lt;XRSystem&gt;();
+
+RigidDynamicComponent ball{ /*...*/ }; 
+
+ball.register_to_systems(systems);
+</code></pre>
+<h4 id="get-1"><a class="header" href="#get-1"><code>get</code></a></h4>
+<pre><code class="language-cpp">template&lt;typename System&gt;
+auto get() -&gt; System*;
+</code></pre>
+<p>Any system type that is not contained in the dynamic system composition will cause a runtime error.</p>
+<h4 id="contains-1"><a class="header" href="#contains-1"><code>contains</code></a></h4>
+<pre><code class="language-cpp">template&lt;typename System&gt;
+auto contains() -&gt; bool;
+</code></pre>
+<p>Return if it contains a system at runtime.</p>
+<h3 id="compare-of-staticsystemcompositon-and-dynamicsystemcomposition"><a class="header" href="#compare-of-staticsystemcompositon-and-dynamicsystemcomposition">Compare of <code>StaticSystemCompositon</code> and <code>DynamicSystemComposition</code></a></h3>
+<div class="table-wrapper"><table><thead><tr><th>Properties</th><th>StaticSystemComposition</th><th>DynamicSystemComposition</th></tr></thead><tbody>
+<tr><td>Memory</td><td>On stack</td><td>On heap</td></tr>
+<tr><td>Add System</td><td>Not allowed</td><td>Allowed</td></tr>
+<tr><td>Remove System</td><td>Not allowed</td><td>Allowed</td></tr>
+<tr><td><code>get</code> type check</td><td>Compile time</td><td>Runtime</td></tr>
+<tr><td><code>get</code> noexcept</td><td>True</td><td>False</td></tr>
+<tr><td>constexpr <code>contains</code></td><td>True</td><td>False</td></tr>
+</tbody></table>
+</div><div style="break-before: page; page-break-before: always;"></div><h1 id="components"><a class="header" href="#components">Components</a></h1>
+<p>Components are small pieces of game logics that require to be <em>registered</em> to one or more systems to function.</p>
+<h2 id="interface"><a class="header" href="#interface">Interface</a></h2>
+<p>A type is considered as a component type as long as it has the following member function:</p>
+<pre><code class="language-cpp">template&lt;typename Systems&gt;
+auto register_to_systems(Systems* systems) -&gt; void;
+</code></pre>
+<h2 id="register_to_systems"><a class="header" href="#register_to_systems"><code>register_to_systems</code></a></h2>
+<p>Example:</p>
+<pre><code class="language-cpp">template&lt;typename Systems&gt;
+auto register_to_systems(Systems* systems) -&gt; void
+{
+	if constexpr (systems-&gt;contains&lt;MySystemA&gt;()) {
+		auto system_a = systems-&gt;get&lt;MySystemA&gt;();
+		// ...
+	}
+
+	if constexpr (systems-&gt;contains&lt;MySystemB&gt;()) {
+		auto system_b = systems-&gt;get&lt;MySystemB&gt;();
+		// ...
+	}
+}
+</code></pre>
+<p>You won't get any compiler error if the <code>Systems</code> as a static system componsition doesn't contain the sepicified system or as a concrete system type that is not the specified one, as that can be infered in compile time and will be ignored thanks to <code>if constexpr</code>. 
+It's up to you to decide if you want to add <code>requires</code> or <code>static_assert</code>, but it's recommended to leave it as it is.</p>
+<p><code>register_to_systems</code> can be called multiple times on different systems, sometimes this way is more convenient than calling it once on a system composition that contains all the systems when if register to a particuar system depends.</p>
+<pre><code class="language-cpp">struct MyComponent
+{
+	template&lt;typename Systems&gt;
+	auto register_to_systems(Systems* systems) -&gt; void
+	{
+		if constexpr (systems-&gt;contains&lt;PhysicsSystem&gt;()) {
+			auto system_a = systems-&gt;get&lt;PhysicsSystem&gt;();
+			// ...
+		}
+		if constexpr (systems-&gt;contains&lt;GraphicsSystem&gt;()) {
+			auto system_b = systems-&gt;get&lt;GraphicsSystem&gt;();
+			// ...
+		}
+	}
+
+	// ...
+};
+
+MyComponent component;
+
+component.register_to_systems(&amp;physics_systems);
+
+if constexpr (visual_debug) {
+	component.register_to_systems(&amp;graphics_systems);
+}
+</code></pre>
+<h2 id="working-with-systems"><a class="header" href="#working-with-systems">Working with Systems</a></h2>
+<p>Most components can't participate in the game logics on their own without registering to any systems.
+You should focus on designing systems and make the systems to organize how components work. 
+Therefore, Arxetipo's components by themselves may not have <code>update</code> or <code>on_enable</code> functions, but you can implement such things that are called by systems.</p>
+<p>Arxetipo at first may not be intuitive compare to many game engines where learners first add a &quot;thing&quot; called &quot;game object&quot;, &quot;actor&quot; or &quot;entity&quot; to the scene, then add components to form that &quot;thing&quot;.
+With Arxetipo, you first design systems, and then design components that work with the systems.
+It might be quite abstractive to start with, but it's more compact, flexible and potentially more efficient.</p>
+<h2 id="component-composition"><a class="header" href="#component-composition">Component Composition</a></h2>
+<p>Just like systems, components can be composed to form a new component.</p>
+<p>The <code>register_to_systems</code> function of a component composition will call the <code>register_to_systems</code> function of each component it contains.</p>
+<p>By definition, a component composition is still considered as a component, despite it's concept to gather components together may be similar to what an &quot;entity&quot; does in a typical ECS architecture.</p>
+<p>There are also two engine-defined composition types: Static Component Composition and Dynamic Component Composition, 
+while you always implement something similar to that on your own.</p>
+<h3 id="static-component-composition"><a class="header" href="#static-component-composition">Static Component Composition</a></h3>
+<pre><code class="language-cpp">template&lt;typename... Types&gt;
+struct StaticComponentComposition;
+</code></pre>
+<h4 id="usage-2"><a class="header" href="#usage-2">Usage</a></h4>
+<pre><code class="language-cpp">using ModelComponent = StaticComponentComposition&lt;SpaceTransform, MeshModelComponent, RigidDynamicComponent&gt;;
+
+ModelComponent model_component{ /*...*/ };
+model_component.register_to_systems(&amp;physics_systems);
+model_component.register_to_systems(&amp;graphics_systems);
+</code></pre>
+<h3 id="dynamic-component-composition"><a class="header" href="#dynamic-component-composition">Dynamic Component Composition</a></h3>
+<pre><code class="language-cpp">struct DynamicComponentComposition;
+</code></pre>
+<h4 id="usage-3"><a class="header" href="#usage-3">Usage</a></h4>
+<pre><code class="language-cpp">DynamicComponentComposition model_component;
+model_component.add&lt;SpaceTransform&gt;({ /*...*/ });
+model_component.add&lt;MeshModelComponent&gt;({ /*...*/ });
+model_component.add&lt;RigidStaticComponent&gt;({ /*...*/ });
+model_component.remove&lt;RigidStaticComponent&gt;();
+model_component.add&lt;RigidDynamicComponent&gt;({ /*...*/ });
+
+if (simulating) {
+	model_component.register_to_systems(&amp;physics_systems);
+}
+
+if (visual_debug) {
+	model_component.register_to_systems(&amp;graphics_systems);
+}
+else {
+	model_component.get&lt;MeshModelComponent&gt;().register_to_systems(&amp;graphics_systems);
+	// RigidDynamicComponent is not registered to graphics_systems.
+}
+</code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="beginner-guide"><a class="header" href="#beginner-guide">Beginner Guide</a></h1>
 <p><a href="../beginner-guide/index.html">Arxetipo Beginner Guide</a></p>
 

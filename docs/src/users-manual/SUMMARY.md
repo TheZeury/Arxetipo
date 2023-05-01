@@ -2,8 +2,14 @@
 
 [Introduction](introduction.md)
 
-- [Foundations, Systems and Components](foundations-systems-and-components.md)
-- [Renderer](renderer.md)
+- [Foundations, Systems and Components](foundations-and-objects.md)
+	- [Foundations](foundations-and-objects/foundation.md)
+	- [Systems](foundations-and-objects/system.md)
+	- [Components](foundations-and-objects/component.md)
+- [XR Plugin]()
+- [Renderer]()
+- [Physics Engine]()
+- [Command Runtime]()
 
 ---
 

@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Foundations, Systems and Components - Arxetipo User&#x27;s Manual</title>
+        <title>Foundations - Arxetipo User&#x27;s Manual</title>
 
 
         <!-- Custom HTML head -->
@@ -12,21 +12,21 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff" />
 
-        <link rel="icon" href="favicon.svg">
-        <link rel="shortcut icon" href="favicon.png">
-        <link rel="stylesheet" href="css/variables.css">
-        <link rel="stylesheet" href="css/general.css">
-        <link rel="stylesheet" href="css/chrome.css">
-        <link rel="stylesheet" href="css/print.css" media="print">
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
-        <link rel="stylesheet" href="fonts/fonts.css">
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" href="highlight.css">
-        <link rel="stylesheet" href="tomorrow-night.css">
-        <link rel="stylesheet" href="ayu-highlight.css">
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
 
         <!-- Custom theme stylesheets -->
 
@@ -35,7 +35,7 @@
     <div id="body-container">
         <!-- Provide site root to javascript -->
         <script>
-            var path_to_root = "";
+            var path_to_root = "../";
             var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
         </script>
 
@@ -83,7 +83,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded affix "><a href="introduction.html">Introduction</a></li><li class="chapter-item expanded "><a href="foundations-systems-and-components.html" class="active"><strong aria-hidden="true">1.</strong> Foundations, Systems and Components</a></li><li class="chapter-item expanded "><a href="renderer.html"><strong aria-hidden="true">2.</strong> Renderer</a></li><li class="spacer"></li><li class="chapter-item expanded affix "><a href="beginner-guide-redirect.html">Beginner Guide</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="../introduction.html">Introduction</a></li><li class="chapter-item expanded "><a href="../foundations-and-objects.html"><strong aria-hidden="true">1.</strong> Foundations, Systems and Components</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../foundations-and-objects/foundation.html" class="active"><strong aria-hidden="true">1.1.</strong> Foundations</a></li><li class="chapter-item expanded "><a href="../foundations-and-objects/system.html"><strong aria-hidden="true">1.2.</strong> Systems</a></li><li class="chapter-item expanded "><a href="../foundations-and-objects/component.html"><strong aria-hidden="true">1.3.</strong> Components</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.</strong> XR Plugin</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">3.</strong> Renderer</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">4.</strong> Physics Engine</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.</strong> Command Runtime</div></li><li class="spacer"></li><li class="chapter-item expanded affix "><a href="../beginner-guide-redirect.html">Beginner Guide</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -115,7 +115,7 @@
                     <h1 class="menu-title">Arxetipo User&#x27;s Manual</h1>
 
                     <div class="right-buttons">
-                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <i id="print-button" class="fa fa-print"></i>
                         </a>
 
@@ -144,17 +144,37 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="foundations-systems-and-components"><a class="header" href="#foundations-systems-and-components">Foundations, Systems and Components</a></h1>
-
+                        <h1 id="foundations"><a class="header" href="#foundations">Foundations</a></h1>
+<p><strong>Foundation</strong> are the first abstraction layers of low-level APIs, complex codes, and third-party libraries.</p>
+<h2 id="suggested-coventions"><a class="header" href="#suggested-coventions">Suggested Coventions</a></h2>
+<p>There are no generic requirements for a foundation since the way they work varies, as they are based on different low-level and third-party APIs. 
+However, there are some conventions that are suggested to be followed:</p>
+<h3 id="1-providing-common-interfaces"><a class="header" href="#1-providing-common-interfaces">1. Providing Common Interfaces</a></h3>
+<p>This is mainly for modularity to ensure the possibility to replace a foundation with another implementation without or only with minimal changes in the other codes.</p>
+<p>For example, a renderer should provide a common interface to create models, render frames, and so on. 
+By providing the same interface, you can write your own renderer and replace the default one with it.</p>
+<h3 id="2-using-proxies-to-resolve-dependencies"><a class="header" href="#2-using-proxies-to-resolve-dependencies">2. Using Proxies to Resolve Dependencies</a></h3>
+<p>Foundations can have dependencies, such as renderers and xr plugins always depending on each other. 
+By extracting the communication between them to a proxy and providing interfaces with that proxy, one foundation can be replaced without changing the other one.</p>
+<h2 id="engine-implemented-foundations"><a class="header" href="#engine-implemented-foundations">Engine implemented Foundations</a></h2>
+<p>Arxeitpo provides some common used foundations. 
+They are sufficient for most use cases, so you typically don't need to write your own.</p>
+<div class="table-wrapper"><table><thead><tr><th>Name</th><th>Description</th></tr></thead><tbody>
+<tr><td><a href="">VulkanRenderer</a></td><td>A Vulkan based renderer.</td></tr>
+<tr><td><a href="">OpenXRPlugin</a></td><td>An OpenXR based XR plugin.</td></tr>
+<tr><td><a href="">PhysXEngine</a></td><td>A PhysX based physics engine.</td></tr>
+<tr><td><a href="">CommandRuntime</a></td><td>A command runtime excuting commands written in &quot;Arxemando&quot;</td></tr>
+</tbody></table>
+</div>
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="introduction.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../foundations-and-objects.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next" href="renderer.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next" href="../foundations-and-objects/system.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -164,11 +184,11 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="introduction.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../foundations-and-objects.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next" href="renderer.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next" href="../foundations-and-objects/system.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>
@@ -183,13 +203,13 @@
         </script>
 
 
-        <script src="elasticlunr.min.js"></script>
-        <script src="mark.min.js"></script>
-        <script src="searcher.js"></script>
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
 
-        <script src="clipboard.min.js"></script>
-        <script src="highlight.js"></script>
-        <script src="book.js"></script>
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
 
         <!-- Custom JS scripts -->
 
