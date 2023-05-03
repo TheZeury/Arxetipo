@@ -110,15 +110,41 @@ namespace arx
 						.rigid_dynamic = RigidDynamicComponent {
 							physics_engine->create_rigid_dynamic(
 								entities.panel.button.transform.get_global_matrix(),
-								physics_engine->create_shape(arx::PhysicsBoxGeometry({ 0.02f, 0.01f, 0.005f }))
+								physics_engine->create_shape(PhysicsBoxGeometry({ 0.02f, 0.01f, 0.005f }))
 							),
 							&entities.panel.button.transform,
 							true
 						},
 						.association = ActorTransformAssociation{ &entities.panel.button.rigid_dynamic, &entities.panel.button.transform },
 						.button = Button {
-							&entities.panel.button.rigid_dynamic, 0.01f
+							&entities.panel.button.rigid_dynamic, 0.01f, 0.8f, false,
 						}
+					},
+					.slider = {
+						.transform = SpaceTransform{
+							{ 0.f, 0.1f, 0.005f },
+							&entities.panel.transform,
+						},
+						.mesh_model = MeshModelComponent{
+							renderer->create_mesh_model(MeshBuilder::Icosphere(0.01f, 3)),
+							renderer->defaults.default_material,
+							&entities.panel.slider.transform
+						},
+						.rigid_dynamic = RigidDynamicComponent {
+							physics_engine->create_rigid_dynamic(
+								entities.panel.slider.transform.get_global_matrix(),
+								physics_engine->create_shape(PhysicsSphereGeometry(0.01f))
+							),
+							&entities.panel.slider.transform,
+							true
+						},
+						.association = ActorTransformAssociation{ &entities.panel.slider.rigid_dynamic, &entities.panel.slider.transform },
+						.slider = Slider({
+							.actor_component = &entities.panel.slider.rigid_dynamic,
+							.no_invoke_before_releasing = true,
+							.initial_value = 0.5f,
+							.length = 0.2f,
+						}),
 					},
 					.rigid_dynamic = RigidDynamicComponent {
 						physics_engine->create_rigid_dynamic(
@@ -169,6 +195,8 @@ namespace arx
 			entities.panel.text.ui_element.register_to_systems(&systems.graphics_system);
 			entities.panel.button.mesh_model.register_to_systems(&systems.graphics_system);
 			entities.panel.button.rigid_dynamic.register_to_systems(&systems.graphics_system);
+			entities.panel.slider.mesh_model.register_to_systems(&systems.graphics_system);
+			entities.panel.slider.rigid_dynamic.register_to_systems(&systems.graphics_system);
 			entities.plane.rigid_static.register_to_systems(&systems.graphics_system);
 			entities.test_sphere.mesh_model.register_to_systems(&systems.graphics_system);
 			entities.test_sphere.rigid_dynamic.register_to_systems(&systems.graphics_system);
@@ -180,6 +208,7 @@ namespace arx
 			entities.xr_controllers.right.point_interactor.register_to_systems(&systems.xr_system);
 			entities.xr_controllers.right.grab_interactor.register_to_systems(&systems.xr_system);
 			entities.panel.button.button.register_to_systems(&systems.xr_system);
+			entities.panel.slider.slider.register_to_systems(&systems.xr_system);
 			entities.panel.grab_interactable.register_to_systems(&systems.xr_system);
 			entities.test_sphere.point_interactable.register_to_systems(&systems.xr_system);
 			entities.test_sphere.grab_interactable.register_to_systems(&systems.xr_system);
@@ -190,12 +219,16 @@ namespace arx
 			entities.xr_controllers.right.association.register_to_systems(&systems.physics_system);
 			entities.panel.button.rigid_dynamic.register_to_systems(&systems.physics_system);
 			entities.panel.button.association.register_to_systems(&systems.physics_system);
+			entities.panel.slider.rigid_dynamic.register_to_systems(&systems.physics_system);
+			entities.panel.slider.association.register_to_systems(&systems.physics_system);
 			entities.panel.rigid_dynamic.register_to_systems(&systems.physics_system);
 			entities.plane.rigid_static.register_to_systems(&systems.physics_system);
 			entities.test_sphere.rigid_dynamic.register_to_systems(&systems.physics_system);
 
 			entities.panel.button.button.on_press = [&]() {
-				entities.test_sphere.rigid_dynamic.rigid_dynamic->setGlobalPose({ 0.f, 10.f, -2.f });
+				auto value = entities.panel.slider.slider.get_value();
+				auto height = 0.5f + value * (10.f - 0.5f);
+				entities.test_sphere.rigid_dynamic.rigid_dynamic->setGlobalPose({ 0.f, height, -2.f });
 			};
 		}
 
@@ -259,6 +292,13 @@ namespace arx
 					ActorTransformAssociation association;
 					Button button;
 				} button;
+				struct {
+					SpaceTransform transform;
+					MeshModelComponent mesh_model;
+					RigidDynamicComponent rigid_dynamic;
+					ActorTransformAssociation association;
+					Slider slider;
+				} slider;
 				RigidDynamicComponent rigid_dynamic;
 				XRGrabInteractable grab_interactable;
 			} panel;

@@ -6,3 +6,4 @@
 #include "../renderer/graphics_objects.hpp"
 
 #include "ui_objects/button.hpp"
+#include "ui_objects/slider.hpp"
