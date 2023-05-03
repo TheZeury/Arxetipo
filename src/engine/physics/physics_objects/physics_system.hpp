@@ -41,8 +41,14 @@ namespace arx
 				if (physx_engine != nullptr) {
 					physx_engine->simulate(time_delta);
 				}
+				for (auto [actor, transform] : associations) {
+					if (std::get<0>(transform->update_matrix())) {
+						actor->setGlobalPose(PhysicsTransform(cnv<PhysicsMat44>(transform->get_global_matrix())));
+					}
+					// Some assications' transform may be updated during the simulation, or, precisely, during the simulation event callback in `fetchResult`.
+				}
 				for (auto [rigid_dynamic, transform] : rigid_dynamics) {
-					if (rigid_dynamic->isSleeping() == false) {
+					if (!rigid_dynamic->isSleeping() && !associations.contains(static_cast<RigidActor*>(rigid_dynamic))) {
 						transform->set_global_matrix(cnv<glm::mat4>(PhysicsMat44(rigid_dynamic->getGlobalPose())));
 					}
 				}

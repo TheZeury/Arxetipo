@@ -97,28 +97,57 @@ namespace arx
 							&entities.panel.text.transform
 						}
 					},
-					.button = {
+					.button_a = {
 						.transform = SpaceTransform{
-							{ 0.f, -0.1f, 0.005f },
+							{ -0.05f, -0.1f, 0.005f + 0.001f },
 							&entities.panel.transform,
 						},
 						.mesh_model = MeshModelComponent{
 							renderer->create_mesh_model(MeshBuilder::Box(0.02, 0.01, 0.005)),
 							renderer->defaults.default_material,
-							&entities.panel.button.transform
+							&entities.panel.button_a.transform
 						},
 						.rigid_dynamic = RigidDynamicComponent {
 							physics_engine->create_rigid_dynamic(
-								entities.panel.button.transform.get_global_matrix(),
+								entities.panel.button_a.transform.get_global_matrix(),
 								physics_engine->create_shape(PhysicsBoxGeometry({ 0.02f, 0.01f, 0.005f }))
 							),
-							&entities.panel.button.transform,
+							&entities.panel.button_a.transform,
 							true
 						},
-						.association = ActorTransformAssociation{ &entities.panel.button.rigid_dynamic, &entities.panel.button.transform },
-						.button = Button {
-							&entities.panel.button.rigid_dynamic, 0.01f, 0.8f, false,
-						}
+						.association = ActorTransformAssociation{ &entities.panel.button_a.rigid_dynamic, &entities.panel.button_a.transform },
+						.button = Button ({
+							.actor_component = &entities.panel.button_a.rigid_dynamic,
+							.keep_activated = false,
+							.pushable = true,
+							.bottom_depth = 0.01f,
+						}),
+					},
+					.button_b = {
+						.transform = SpaceTransform{
+							{ 0.05f, -0.1f, 0.005f + 0.001f },
+							&entities.panel.transform,
+						},
+						.mesh_model = MeshModelComponent{
+							renderer->create_mesh_model(MeshBuilder::Box(0.02, 0.01, 0.005)),
+							renderer->defaults.default_material,
+							&entities.panel.button_b.transform
+						},
+						.rigid_dynamic = RigidDynamicComponent {
+							physics_engine->create_rigid_dynamic(
+								entities.panel.button_b.transform.get_global_matrix(),
+								physics_engine->create_shape(PhysicsBoxGeometry({ 0.02f, 0.01f, 0.005f }))
+							),
+							&entities.panel.button_b.transform,
+							true
+						},
+						.association = ActorTransformAssociation{ &entities.panel.button_b.rigid_dynamic, &entities.panel.button_b.transform },
+						.button = Button({
+							.actor_component = &entities.panel.button_b.rigid_dynamic,
+							.keep_activated = true,
+							.pushable = true,
+							.bottom_depth = 0.01f,
+						}),
 					},
 					.slider = {
 						.transform = SpaceTransform{
@@ -193,8 +222,10 @@ namespace arx
 			entities.xr_controllers.right.rigid_static.register_to_systems(&systems.graphics_system);
 			entities.panel.ui_element.register_to_systems(&systems.graphics_system);
 			entities.panel.text.ui_element.register_to_systems(&systems.graphics_system);
-			entities.panel.button.mesh_model.register_to_systems(&systems.graphics_system);
-			entities.panel.button.rigid_dynamic.register_to_systems(&systems.graphics_system);
+			entities.panel.button_a.mesh_model.register_to_systems(&systems.graphics_system);
+			entities.panel.button_a.rigid_dynamic.register_to_systems(&systems.graphics_system);
+			entities.panel.button_b.mesh_model.register_to_systems(&systems.graphics_system);
+			entities.panel.button_b.rigid_dynamic.register_to_systems(&systems.graphics_system);
 			entities.panel.slider.mesh_model.register_to_systems(&systems.graphics_system);
 			entities.panel.slider.rigid_dynamic.register_to_systems(&systems.graphics_system);
 			entities.plane.rigid_static.register_to_systems(&systems.graphics_system);
@@ -207,7 +238,8 @@ namespace arx
 			entities.xr_controllers.right.controller.register_to_systems(&systems.xr_system);
 			entities.xr_controllers.right.point_interactor.register_to_systems(&systems.xr_system);
 			entities.xr_controllers.right.grab_interactor.register_to_systems(&systems.xr_system);
-			entities.panel.button.button.register_to_systems(&systems.xr_system);
+			entities.panel.button_a.button.register_to_systems(&systems.xr_system);
+			entities.panel.button_b.button.register_to_systems(&systems.xr_system);
 			entities.panel.slider.slider.register_to_systems(&systems.xr_system);
 			entities.panel.grab_interactable.register_to_systems(&systems.xr_system);
 			entities.test_sphere.point_interactable.register_to_systems(&systems.xr_system);
@@ -217,18 +249,26 @@ namespace arx
 			entities.xr_controllers.left.association.register_to_systems(&systems.physics_system);
 			entities.xr_controllers.right.rigid_static.register_to_systems(&systems.physics_system);
 			entities.xr_controllers.right.association.register_to_systems(&systems.physics_system);
-			entities.panel.button.rigid_dynamic.register_to_systems(&systems.physics_system);
-			entities.panel.button.association.register_to_systems(&systems.physics_system);
+			entities.panel.button_a.rigid_dynamic.register_to_systems(&systems.physics_system);
+			entities.panel.button_a.association.register_to_systems(&systems.physics_system);
+			entities.panel.button_b.rigid_dynamic.register_to_systems(&systems.physics_system);
+			entities.panel.button_b.association.register_to_systems(&systems.physics_system);
 			entities.panel.slider.rigid_dynamic.register_to_systems(&systems.physics_system);
 			entities.panel.slider.association.register_to_systems(&systems.physics_system);
 			entities.panel.rigid_dynamic.register_to_systems(&systems.physics_system);
 			entities.plane.rigid_static.register_to_systems(&systems.physics_system);
 			entities.test_sphere.rigid_dynamic.register_to_systems(&systems.physics_system);
 
-			entities.panel.button.button.on_press = [&]() {
+			entities.panel.button_a.button.on_press = [&]() {
 				auto value = entities.panel.slider.slider.get_value();
 				auto height = 0.5f + value * (10.f - 0.5f);
 				entities.test_sphere.rigid_dynamic.rigid_dynamic->setGlobalPose({ 0.f, height, -2.f });
+			};
+			entities.panel.button_b.button.on_press = [&]() {
+				fundations.renderer->debug_mode = VulkanRenderer::DebugMode::OnlyDebug;
+			};
+			entities.panel.button_b.button.on_release = [&]() {
+				fundations.renderer->debug_mode = VulkanRenderer::DebugMode::Mixed;
 			};
 		}
 
@@ -291,7 +331,14 @@ namespace arx
 					RigidDynamicComponent rigid_dynamic;
 					ActorTransformAssociation association;
 					Button button;
-				} button;
+				} button_a;
+				struct {
+					SpaceTransform transform;
+					MeshModelComponent mesh_model;
+					RigidDynamicComponent rigid_dynamic;
+					ActorTransformAssociation association;
+					Button button;
+				} button_b;
 				struct {
 					SpaceTransform transform;
 					MeshModelComponent mesh_model;
