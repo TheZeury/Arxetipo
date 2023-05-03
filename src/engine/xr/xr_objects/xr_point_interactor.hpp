@@ -47,7 +47,7 @@ namespace arx
 		};
 
 		struct Interactable {
-			virtual auto pass_event(EventType event_type, const ActionState& actions) -> void = 0;
+			virtual auto pass_event(EventType event_type, const ActionState& actions, SpaceTransform* contact_transform) -> void = 0;
 		};
 
 		struct PointInteractorTriggerCallback : public ITriggerCallback {
@@ -61,7 +61,7 @@ namespace arx
 					return;
 				}
 				Interactable* interactable = static_cast<Interactable*>(iter->second);
-				interactor->add_candidate(interactable);
+				interactor->add_candidate(interactable, get_transform_from_shape(pair.triggerActor, pair.triggerShape));
 			}
 			auto OnExit(const TriggerPair& pair) -> void override {
 				auto actor = pair.otherActor;
@@ -71,7 +71,7 @@ namespace arx
 					return;
 				}
 				Interactable* interactable = static_cast<Interactable*>(iter->second);
-				interactor->remove_candidate(interactable);
+				interactor->remove_candidate(interactable, get_transform_from_shape(pair.triggerActor, pair.triggerShape));
 			}
 		};
 
@@ -181,50 +181,52 @@ namespace arx
 				}
 			}
 
-			for (auto& candidate : candidates) {
-				candidate->pass_event(EventType::Hovering, action_state);
+			for (auto& [candidate, contact_transform] : candidates) {
+				candidate->pass_event(EventType::Hovering, action_state, contact_transform);
 			}
 
+			auto& [candidate, contact_transform] = selected;
+
 			if (action_state.trigger_pressed) {
-				if (selected != nullptr) {
+				if (candidate != nullptr) {
 					log_error("Interactor tried selecting a new interactable, but it already had one selected. Releasing the old selected interactable");
-					selected->pass_event(EventType::Deselect, action_state);
-					selected = nullptr;
+					candidate->pass_event(EventType::Deselect, action_state, contact_transform);
+					selected = { nullptr, nullptr };
 				}
 				if (!candidates.empty()) {
 					selected = *candidates.begin();
-					selected->pass_event(EventType::Select, action_state);
+					candidate->pass_event(EventType::Select, action_state, contact_transform);
 				}
 			}
 			else if (action_state.trigger_released) {
-				if (selected != nullptr) {
-					selected->pass_event(EventType::Deselect, action_state);
-					selected = nullptr;
+				if (candidate != nullptr) {
+					candidate->pass_event(EventType::Deselect, action_state, contact_transform);
+					selected = { nullptr, nullptr };
 				}
 			}
 
-			if (selected != nullptr) {
-				selected->pass_event(EventType::Selecting, action_state);
+			if (candidate != nullptr) {
+				candidate->pass_event(EventType::Selecting, action_state, contact_transform);
 			}
 		}
 
-		auto add_candidate(Interactable* interactable) -> void {
-			if (candidates.find(interactable) == candidates.end()) {
-				candidates.insert(interactable);
-				interactable->pass_event(EventType::Enter, action_state);
+		auto add_candidate(Interactable* interactable, SpaceTransform* contact_transform) -> void {
+			if (candidates.find({ interactable, contact_transform }) == candidates.end()) {
+				candidates.insert({ interactable, contact_transform });
+				interactable->pass_event(EventType::Enter, action_state, contact_transform);
 			}
 		}
 
-		auto remove_candidate(Interactable* interactable) -> void {
-			if (candidates.find(interactable) != candidates.end()) {
-				candidates.erase(interactable);
-				interactable->pass_event(EventType::Exit, action_state);
+		auto remove_candidate(Interactable* interactable, SpaceTransform* contact_transform) -> void {
+			if (candidates.find({ interactable, contact_transform }) != candidates.end()) {
+				candidates.erase({ interactable, contact_transform });
+				interactable->pass_event(EventType::Exit, action_state, contact_transform);
 			}
 		}
 
 		auto generate_trigger_shape(PhysXEngine* physics_engine, const PhysicsGeometry& geometry, const glm::mat4& local_transform = glm::mat4{ 1.f }) -> PhysicsShape* {
 			auto shape = physics_engine->create_shape(geometry, local_transform, PhysicsShapeFlag::eVISUALIZATION | PhysicsShapeFlag::eSCENE_QUERY_SHAPE | PhysicsShapeFlag::eTRIGGER_SHAPE);
-			shape->setSimulationFilterData({ 0, 0, PhysicsSystem::SimulationFilterBits::XRPointable, 0 });
+			shape->setSimulationFilterData({ PhysicsSystem::SimulationFilterBits::XRUIInteractor, 0, PhysicsSystem::SimulationFilterBits::XRPointable, 0 });
 			shape->userData = new PointInteractorTriggerCallback{ this };
 			return shape;
 		}
@@ -234,10 +236,40 @@ namespace arx
 		}
 
 	public:
-		std::unordered_set<Interactable*> candidates;
-		Interactable* selected = nullptr;
+		std::set<std::tuple<Interactable*, SpaceTransform*>> candidates;
+		std::tuple<Interactable*, SpaceTransform*> selected = { nullptr, nullptr };
 		ActionState action_state;
 		XRController* controller;
 		XRSystem* xr_system = nullptr;
+
+	public:
+		static auto get_transform_from_shape(PhysicsActor* actor, PhysicsShape* shape) -> SpaceTransform* {
+			switch (actor->getConcreteType())
+			{
+			case physx::PxConcreteType::eRIGID_STATIC: {
+				auto component = static_cast<RigidStaticComponent*>(actor->userData);
+				if (component->shape_transforms.contains(shape)) {
+					return component->shape_transforms.at(shape).get();
+				}
+				else {
+					log_error("shape not found, returning transform of the actor.");
+					return component->transform;
+				}
+			}
+			case physx::PxConcreteType::eRIGID_DYNAMIC: {
+				auto component = static_cast<RigidDynamicComponent*>(actor->userData);
+				if (component->shape_transforms.contains(shape)) {
+					return component->shape_transforms.at(shape).get();
+				}
+				else {
+					log_error("shape not found, returning transform of the actor.");
+					return component->transform;
+				}
+			}
+			default: {
+				throw std::runtime_error("PhysicsSystem::get_transform_from_shape: Unknown actor type.");
+			}
+			}
+		}
 	};
 }

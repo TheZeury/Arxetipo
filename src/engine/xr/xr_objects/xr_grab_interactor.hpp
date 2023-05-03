@@ -224,7 +224,7 @@ namespace arx
 
 		auto generate_trigger_shape(PhysXEngine* physics_engine, const PhysicsGeometry& geometry, const glm::mat4& local_transform = glm::mat4{ 1.f }) -> PhysicsShape* {
 			auto shape = physics_engine->create_shape(geometry, local_transform, PhysicsShapeFlag::eVISUALIZATION | PhysicsShapeFlag::eSCENE_QUERY_SHAPE | PhysicsShapeFlag::eTRIGGER_SHAPE);
-			shape->setSimulationFilterData({ 0, 0, PhysicsSystem::SimulationFilterBits::XRGrabable, 0 });
+			shape->setSimulationFilterData({ PhysicsSystem::SimulationFilterBits::XRUIInteractor, 0, PhysicsSystem::SimulationFilterBits::XRGrabable, 0 });
 			shape->userData = new GrabInteractorTriggerCallback{ this };
 			return shape;
 		}

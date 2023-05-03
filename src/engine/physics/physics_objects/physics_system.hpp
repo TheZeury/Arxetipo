@@ -11,6 +11,7 @@ namespace arx
 				UI = 1 << 1,
 				XRPointable = 1 << 2,
 				XRGrabable = 1 << 3,
+				XRUIInteractor = 1 << 4,
 			};
 		};
 

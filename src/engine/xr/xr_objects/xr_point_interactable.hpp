@@ -18,7 +18,7 @@ namespace arx
 					shape->setSimulationFilterData({
 						filter_data.word0 | PhysicsSystem::SimulationFilterBits::XRPointable,
 						filter_data.word1,
-						filter_data.word2,
+						filter_data.word2 | (only_ui ? PhysicsSystem::SimulationFilterBits::XRUIInteractor : 0),
 						filter_data.word3,
 						});
 				}
@@ -28,7 +28,7 @@ namespace arx
 		}
 
 	public:
-		auto pass_event(XRPointInteractor::EventType event_type, const XRPointInteractor::ActionState& actions) -> void override {
+		auto pass_event(XRPointInteractor::EventType event_type, const XRPointInteractor::ActionState& actions, SpaceTransform* contact_transform) -> void override {
 			switch (event_type) {
 			case XRPointInteractor::EventType::Enter: {
 				if (on_enter != nullptr)
@@ -78,11 +78,12 @@ namespace arx
 		XRPointInteractable(RigidActor* actor) : actor{ actor } {
 		}
 		template<typename ActorComponent>
-		XRPointInteractable(ActorComponent* actor_component) : actor{ actor_component->get_rigid_actor() } {
+		XRPointInteractable(ActorComponent* actor_component, bool only_ui = false) : actor{ actor_component->get_rigid_actor() }, only_ui{ only_ui } {
 		}
 
 	public:
 		RigidActor* actor;
+		bool only_ui;
 		XRSystem* xr_system = nullptr;
 	};
 }

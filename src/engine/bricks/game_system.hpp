@@ -14,7 +14,7 @@ namespace arx
 		{ systems.template get<SystemName>() } -> std::convertible_to<SystemName*>;
 	};
 
-	template<typename... types>
+	template<typename... Types>
 	struct StaticSystemComposition;
 
 	template<>
@@ -28,27 +28,28 @@ namespace arx
 	struct StaticSystemComposition<This, Rest...>
 	{
 	public:
-		StaticSystemComposition(This* this_system, Rest*... rests) : system{ this_system }, others{ rests } {
+		StaticSystemComposition(This* this_system, Rest*... rests) : this_system{ this_system }, others{ rests } {
 		}
 		~StaticSystemComposition() = default;
-		This* system;
+		This* this_system;
+		StaticSystemComposition<Rest...> others;
 
 		auto mobilize() -> void {
-			system->mobilize();
+			this_system->mobilize();
 			if constexpr (sizeof...(Rest) > 0) {
 				others.mobilize();
 			}
 		}
 
 		auto freeze() -> void {
-			system->freeze();
+			this_system->freeze();
 			if constexpr (sizeof...(Rest) > 0) {
 				others.freeze();
 			}
 		}
 
 		auto update() -> void {
-			system->update();
+			this_system->update();
 			if constexpr (sizeof...(Rest) > 0) {
 				others.update();
 			}
@@ -59,15 +60,12 @@ namespace arx
 		requires std::same_as<S, This> || (std::same_as<S, Rest> || ...)
 		constexpr auto get() noexcept -> S* {
 			if constexpr (std::is_same_v<S, This>) {
-				return system;
+				return this_system;
 			}
 			else {
 				return others.template get<S>();
 			}
 		}
-
-	private:
-		StaticSystemComposition<Rest...> others;
 	};
 
 	struct DynamicSystem

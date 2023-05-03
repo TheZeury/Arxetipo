@@ -18,7 +18,7 @@ namespace arx
 					shape->setSimulationFilterData({
 						filter_data.word0 | PhysicsSystem::SimulationFilterBits::XRGrabable,
 						filter_data.word1,
-						filter_data.word2,
+						filter_data.word2 | (only_ui ? PhysicsSystem::SimulationFilterBits::XRUIInteractor : 0),
 						filter_data.word3,
 						});
 				}
@@ -44,13 +44,14 @@ namespace arx
 				if (free_grab) {
 					attach_transform.set_local_matrix(glm::inverse(actor_transform->get_global_matrix()) * actions.transform->get_global_matrix());
 				}
+				no_gravity = actor->getActorFlags() & PhysicsActorFlag::eDISABLE_GRAVITY;
 				actor->setActorFlag(PhysicsActorFlag::eDISABLE_GRAVITY, true);
 				if (on_select != nullptr)
 					on_select();
 				break;
 			}
 			case XRGrabInteractor::EventType::Deselect: {
-				actor->setActorFlag(PhysicsActorFlag::eDISABLE_GRAVITY, false);
+				actor->setActorFlag(PhysicsActorFlag::eDISABLE_GRAVITY, no_gravity);
 				if (on_deselect != nullptr)
 					on_deselect();
 				break;
@@ -87,8 +88,9 @@ namespace arx
 
 	public:
 		template<typename ActorComponent>
-		XRGrabInteractable(ActorComponent* actor_component, bool free_grab = true, bool kinematic = false) : 
+		XRGrabInteractable(ActorComponent* actor_component, bool only_ui = false, bool free_grab = true, bool kinematic = false) : 
 			actor{ actor_component->get_rigid_actor() }, 
+			only_ui{ only_ui },
 			free_grab { free_grab },
 			kinematic{ kinematic },
 			actor_transform{ actor_component->transform }, // Copy pointer.
@@ -97,7 +99,11 @@ namespace arx
 		}
 
 	public:
+		bool no_gravity = false;
+
+	public:
 		RigidActor* actor;
+		bool only_ui;
 		bool free_grab;
 		bool kinematic;
 		SpaceTransform* actor_transform;

@@ -5,6 +5,7 @@
 #include "engine/renderer/graphics_objects.hpp"
 #include "engine/xr/xr_objects.hpp"
 #include "engine/physics/physics_objects.hpp"
+#include "engine/ui/ui_objects.hpp"
 #include "engine/command/command.hpp"
 
 #include <chrono>
