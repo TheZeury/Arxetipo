@@ -104,7 +104,7 @@ namespace arx
 			transforms.insert(transform);
 		}
 		auto remove_ui_element(UIElement* element, Bitmap* bitmap, SpaceTransform* transform) -> void {
-#if defined(NDEBUG)
+//#if defined(NDEBUG)
 			for (auto itr = ui_elements.begin(); itr != ui_elements.end(); ++itr) { // TODO: to be optimized.
 				if (*itr == std::tuple{ bitmap, element, &(transform->global_matrix) }) {
 					ui_elements.erase(itr);
@@ -112,16 +112,16 @@ namespace arx
 				}
 			}
 			transforms.erase(transforms.find(transform));
-#else
-			auto itr_u = ui_elements.find({ bitmap, element, &(transform->global_matrix) });
-			if (itr_u != ui_elements.end()) {
-				ui_elements.erase(itr_u);
-			}
-			auto itr_t = transforms.find(transform);
-			if (itr_t != transforms.end()) {
-				transforms.erase(itr_t);
-			}
-#endif
+//#else
+//			auto itr_u = ui_elements.find({ bitmap, element, &(transform->global_matrix) });
+//			if (itr_u != ui_elements.end()) {
+//				ui_elements.erase(itr_u);
+//			}
+//			auto itr_t = transforms.find(transform);
+//			if (itr_t != transforms.end()) {
+//				transforms.erase(itr_t);
+//			}
+//#endif
 		}
 
 		struct {

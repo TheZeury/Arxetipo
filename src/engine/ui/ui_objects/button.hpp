@@ -167,4 +167,96 @@ namespace arx
 		float switch_depth;
 		XRSystem* xr_system = nullptr;
 	};
+
+	namespace presets {
+		struct BlankBoxButton {
+		public:
+			struct Settings {
+				SpaceTransform* transform;
+				glm::vec3 half_extent;
+				std::string text = { };
+				Bitmap* font = nullptr;
+				bool keep_activated = true;
+				bool pushable = true;
+				float activating_factor = 0.6f;
+				float switch_factor = 0.8f;
+				bool debug_visualized = false;
+				std::function<void()> on_press = nullptr;
+				std::function<void()> on_release = nullptr;
+			};
+
+		public:
+			template<typename Systems>
+			auto register_to_systems(Systems* systems) -> void {
+				mesh_model.register_to_systems(systems);
+				rigid_dynamic.register_to_systems(systems);
+				association.register_to_systems(systems);
+				button.register_to_systems(systems);
+				if (text.ui_element.ui_element != nullptr) {
+					text.ui_element.register_to_systems(systems);
+				}
+			}
+
+		public: // Callbacks.
+			std::function<void()>& on_press;
+			std::function<void()>& on_release;
+
+		public:
+			BlankBoxButton(VulkanRenderer* renderer, PhysXEngine* physics_engine, Settings&& settings) :
+				transform{ settings.transform },
+				mesh_model{
+					renderer->create_mesh_model(
+						MeshBuilder::Box(settings.half_extent.x, settings.half_extent.y, settings.half_extent.z)
+							.transform(glm::translate(glm::mat4{ 1.f }, { 0.f, 0.f, settings.half_extent.z }))
+					),
+					renderer->defaults.default_material,
+					transform
+				},
+				rigid_dynamic{
+					physics_engine->create_rigid_dynamic(
+						transform->get_global_matrix(),
+						physics_engine->create_shape(
+							PhysicsBoxGeometry({ settings.half_extent.x, settings.half_extent.y, settings.half_extent.z }),
+							glm::translate(glm::mat4{ 1.f }, { 0.f, 0.f, settings.half_extent.z })
+						)
+					),
+					transform,
+					settings.debug_visualized,
+				},
+				association{ &rigid_dynamic, transform },
+				button{ {
+					.actor_component = &rigid_dynamic,
+					.keep_activated = settings.keep_activated,
+					.pushable = settings.pushable,
+					.bottom_depth = settings.half_extent.z * 2.f,
+					.activating_factor = settings.activating_factor,
+					.switch_factor = settings.switch_factor,
+				} },
+				on_press{ button.on_press },
+				on_release{ button.on_release },
+				text{
+					.transform = SpaceTransform{ glm::vec3(0.f, 0.f, settings.half_extent.z * 2.f + 0.001f), transform },
+					.ui_element = UIElementComponent{
+						(settings.text.empty() || settings.font == nullptr) ? nullptr : renderer->create_ui_text(settings.text, settings.half_extent.y * 2.f, settings.font),
+						settings.font,
+						&text.transform,
+					}
+				}
+			{
+				button.on_press = std::move(settings.on_press);
+				button.on_release = std::move(settings.on_release);
+			}
+
+		public:
+			SpaceTransform* transform;
+			MeshModelComponent mesh_model;
+			RigidDynamicComponent rigid_dynamic;
+			ActorTransformAssociation association;
+			Button button;
+			struct {
+				SpaceTransform transform;
+				UIElementComponent ui_element;
+			} text;
+		};
+	}
 }

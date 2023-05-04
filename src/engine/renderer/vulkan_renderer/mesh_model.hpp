@@ -141,32 +141,32 @@ namespace arx
 
 	public:
 		// Add a vertex and return it's index in the model.
-		auto addVertex(Vertex vertex) -> uint32_t {
-			if (!uniqueVertices.contains(vertex))
+		auto add_vertex(Vertex vertex) -> uint32_t {
+			if (!unique_vertices.contains(vertex))
 			{
-				if (removedVertices.empty())
+				if (removed_vertices.empty())
 				{
-					uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+					unique_vertices[vertex] = static_cast<uint32_t>(vertices.size());
 					vertices.push_back(vertex);
 				}
 				else
 				{
-					auto index = *removedVertices.begin(); removedVertices.erase(index);
-					uniqueVertices[vertex] = index;
+					auto index = *removed_vertices.begin(); removed_vertices.erase(index);
+					unique_vertices[vertex] = index;
 					vertices[index] = vertex;
 				}
 			}
-			return uniqueVertices[vertex];
+			return unique_vertices[vertex];
 		}
 
 		// Add a new Traingle based on three vertices. Counter-clock side is the front. Face index is returned.
-		auto addTriangle(uint32_t v1, uint32_t v2, uint32_t v3) -> uint32_t {
+		auto add_triangle(uint32_t v1, uint32_t v2, uint32_t v3) -> uint32_t {
 			if (v1 == v2 || v2 == v3 || v3 == v1)
 			{
 				// throw std::runtime_error("Three vertices must be all different."); // No need to crash, just don't do anything.
 				return UINT32_MAX;
 			}
-			auto tester = [&](uint32_t v) { if (v >= vertices.size() || removedVertices.contains(v)) throw std::runtime_error(std::format("Newly added vertex {} doesn't exist.", v)); };
+			auto tester = [&](uint32_t v) { if (v >= vertices.size() || removed_vertices.contains(v)) throw std::runtime_error(std::format("Newly added vertex {} doesn't exist.", v)); };
 			tester(v1); tester(v2); tester(v3);
 
 			MeshIndexedTriangle triangle;
@@ -175,72 +175,92 @@ namespace arx
 			else if (v2 < v3) triangle = std::make_tuple(v2, v3, v1);			//
 			else triangle = std::make_tuple(v3, v1, v2);						//
 
-			if (!uniqueTriangles.contains(triangle))
+			if (!unique_triangles.contains(triangle))
 			{
-				if (removeTriangles.empty())
+				if (removed_triangles.empty())
 				{
-					uniqueTriangles[triangle] = static_cast<uint32_t>(triangles.size());
+					unique_triangles[triangle] = static_cast<uint32_t>(triangles.size());
 					triangles.push_back(triangle);
 				}
 				else
 				{
-					auto index = *removeTriangles.begin(); removeTriangles.erase(index);
-					uniqueTriangles[triangle] = index;
+					auto index = *removed_triangles.begin(); removed_triangles.erase(index);
+					unique_triangles[triangle] = index;
 					triangles[index] = triangle;
 				}
 			}
-			return uniqueTriangles[triangle];
+			return unique_triangles[triangle];
 		}
 
 		// Add a new Traingle with three specified vertices. return a tuple of [traingle_index, vertex_index_1, vertex_index_2, vertex_index_3];
-		auto addTriangle(Vertex v1, Vertex v2, Vertex v3) -> std::tuple<uint32_t, uint32_t, uint32_t, uint32_t> {
-			auto i1 = addVertex(v1), i2 = addVertex(v2), i3 = addVertex(v3);
-			return std::make_tuple(addTriangle(i1, i2, i3), i1, i2, i3);
+		auto add_triangle(Vertex v1, Vertex v2, Vertex v3) -> std::tuple<uint32_t, uint32_t, uint32_t, uint32_t> {
+			auto i1 = add_vertex(v1), i2 = add_vertex(v2), i3 = add_vertex(v3);
+			return std::make_tuple(add_triangle(i1, i2, i3), i1, i2, i3);
 		}
 
 		// Update a existing vertex by pass it's index and new value.
-		auto updateVertex(uint32_t v, Vertex value) -> void {
-			uniqueVertices.erase(vertices[v]);
+		auto update_vertex(uint32_t v, Vertex value) -> void {
+			unique_vertices.erase(vertices[v]);
 			vertices[v] = value;
-			uniqueVertices[value] = v;
+			unique_vertices[value] = v;
 		}
 
 		// Remove a particular vertex. All traingles using this vertex will be deleted also. Avoid calling this since current implementaton is expensive ( Iterate through all face to find those to delete. ).
-		auto removeVertex(uint32_t v) -> void {
+		auto remove_vertex(uint32_t v) -> void {
 			// TODO
-			uniqueVertices.erase(vertices[v]);
-			removedVertices.insert(v);
+			unique_vertices.erase(vertices[v]);
+			removed_vertices.insert(v);
 
-			for (auto [triangle, index] : uniqueTriangles)
+			for (auto [triangle, index] : unique_triangles)
 			{
 				auto [v1, v2, v3] = triangle;
 				if (v1 == v || v2 == v || v3 == v)
 				{
-					removeTriangle(index);
+					remove_triangle(index);
 				}
 			}
 		}
 
 		// Remove a particular traingle. Vertics it's using won't be deleted.
-		auto removeTriangle(uint32_t t) -> void {
-			uniqueTriangles.erase(triangles[t]);
-			removeTriangles.insert(t);
+		auto remove_triangle(uint32_t t) -> void {
+			unique_triangles.erase(triangles[t]);
+			removed_triangles.insert(t);
 		}
 
 		// 
-		auto getVertex(uint32_t v) -> Vertex {
+		auto get_vertex(uint32_t v) -> Vertex {
 			return vertices[v];
 		}
 
 		// 
-		auto getTriangle(uint32_t t) -> Triangle {
+		auto get_triangle(uint32_t t) -> Triangle {
 			auto [v1, v2, v3] = triangles[t];
 			return std::make_tuple(vertices[v1], vertices[v2], vertices[v3]);
 		}
 
 		//
-		auto getIndexedTriangle(uint32_t t) -> IndexedTriangle {
+		auto get_indexed_triangle(uint32_t t) -> IndexedTriangle {
 			return triangles[t];
+		}
+
+		auto transform(const glm::mat4& matrix) -> MeshBuilder& {
+			for (auto& vertex : vertices)
+			{
+				vertex.position = matrix * glm::vec4(vertex.position, 1.0f);
+				vertex.normal = matrix * glm::vec4(vertex.normal, 0.0f);
+			}
+			regenerate_unique_vertices();
+			return *this;
+		}
+
+		auto regenerate_unique_vertices() -> void {
+			unique_vertices.clear();
+			for (uint32_t v = 0; v < vertices.size(); ++v)
+			{
+				if (!removed_vertices.contains(v)) {
+					unique_vertices[vertices[v]] = v;
+				}
+			}
 		}
 
 		auto build() const -> std::tuple<std::vector<Vertex>, std::vector<uint32_t>> {
@@ -251,7 +271,7 @@ namespace arx
 			for (uint32_t v = 0; v < vertices.size(); ++v)
 			{
 				vertices_to_build_vertices_map[v] = static_cast<uint32_t>(build_vertices.size());
-				if (!removedVertices.contains(v))
+				if (!removed_vertices.contains(v))
 				{
 					build_vertices.push_back(vertices[v]);
 				}
@@ -269,53 +289,53 @@ namespace arx
 		}
 
 	public:
-		static MeshBuilder Box(float halfX, float halfY, float halfZ) {
+		static MeshBuilder Box(float half_x, float half_y, float half_z) {
 			MeshBuilder mesh;
-			mesh.vertices = {
+			std::array<uint32_t, 24> v = {
 				// down
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{ -1.f, -1.f,  1.f }, { 0.f, 1.f }, {  0.f, -1.f,  0.f }, { }, { } },
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{ -1.f, -1.f, -1.f }, { 1.f, 1.f }, {  0.f, -1.f,  0.f }, { }, { } },
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{  1.f, -1.f, -1.f }, { 1.f, 0.f }, {  0.f, -1.f,  0.f }, { }, { } },
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{  1.f, -1.f,  1.f }, { 0.f, 0.f }, {  0.f, -1.f,  0.f }, { }, { } },
-				// up
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{ -1.f,  1.f,  1.f }, { 0.f, 1.f }, {  0.f,  1.f,  0.f }, { }, { } },
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{  1.f,  1.f,  1.f }, { 1.f, 1.f }, {  0.f,  1.f,  0.f }, { }, { } },
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{  1.f,  1.f, -1.f }, { 1.f, 0.f }, {  0.f,  1.f,  0.f }, { }, { } },
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{ -1.f,  1.f, -1.f }, { 0.f, 0.f }, {  0.f,  1.f,  0.f }, { }, { } },
-				// front
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{ -1.f, -1.f,  1.f }, { 0.f, 1.f }, {  0.f,  0.f,  1.f }, { }, { } },
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{  1.f, -1.f,  1.f }, { 1.f, 1.f }, {  0.f,  0.f,  1.f }, { }, { } },
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{  1.f,  1.f,  1.f }, { 1.f, 0.f }, {  0.f,  0.f,  1.f }, { }, { } },
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{ -1.f,  1.f,  1.f }, { 0.f, 0.f }, {  0.f,  0.f,  1.f }, { }, { } },
-				// back
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{ -1.f, -1.f, -1.f }, { 0.f, 1.f }, {  0.f,  0.f, -1.f }, { }, { } },
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{ -1.f,  1.f, -1.f }, { 1.f, 1.f }, {  0.f,  0.f, -1.f }, { }, { } },
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{  1.f,  1.f, -1.f }, { 1.f, 0.f }, {  0.f,  0.f, -1.f }, { }, { } },
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{  1.f, -1.f, -1.f }, { 0.f, 0.f }, {  0.f,  0.f, -1.f }, { }, { } },
-				// left
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{ -1.f, -1.f,  1.f }, { 0.f, 1.f }, { -1.f,  0.f,  0.f }, { }, { } },
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{ -1.f,  1.f,  1.f }, { 1.f, 1.f }, { -1.f,  0.f,  0.f }, { }, { } },
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{ -1.f,  1.f, -1.f }, { 1.f, 0.f }, { -1.f,  0.f,  0.f }, { }, { } },
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{ -1.f, -1.f, -1.f }, { 0.f, 0.f }, { -1.f,  0.f,  0.f }, { }, { } },
-				// right
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{  1.f, -1.f,  1.f }, { 0.f, 1.f }, {  1.f,  0.f,  0.f }, { }, { } },
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{  1.f, -1.f, -1.f }, { 1.f, 1.f }, {  1.f,  0.f,  0.f }, { }, { } },
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{  1.f,  1.f, -1.f }, { 1.f, 0.f }, {  1.f,  0.f,  0.f }, { }, { } },
-				Vertex{ glm::vec3{ halfX, halfY, halfZ } *glm::vec3{  1.f,  1.f,  1.f }, { 0.f, 0.f }, {  1.f,  0.f,  0.f }, { }, { } },
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{ -1.f, -1.f,  1.f }, .uv = { 0.f, 1.f }, .normal = {  0.f, -1.f,  0.f }, .tangent = { }, .bitangent = { } }),
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{ -1.f, -1.f, -1.f }, .uv = { 1.f, 1.f }, .normal = {  0.f, -1.f,  0.f }, .tangent = { }, .bitangent = { } }),
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{  1.f, -1.f, -1.f }, .uv = { 1.f, 0.f }, .normal = {  0.f, -1.f,  0.f }, .tangent = { }, .bitangent = { } }),
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{  1.f, -1.f,  1.f }, .uv = { 0.f, 0.f }, .normal = {  0.f, -1.f,  0.f }, .tangent = { }, .bitangent = { } }),
+				// up									   
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{ -1.f,  1.f,  1.f }, .uv = { 0.f, 1.f }, .normal = {  0.f,  1.f,  0.f }, .tangent = { }, .bitangent = { } }),
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{  1.f,  1.f,  1.f }, .uv = { 1.f, 1.f }, .normal = {  0.f,  1.f,  0.f }, .tangent = { }, .bitangent = { } }),
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{  1.f,  1.f, -1.f }, .uv = { 1.f, 0.f }, .normal = {  0.f,  1.f,  0.f }, .tangent = { }, .bitangent = { } }),
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{ -1.f,  1.f, -1.f }, .uv = { 0.f, 0.f }, .normal = {  0.f,  1.f,  0.f }, .tangent = { }, .bitangent = { } }),
+				// front								   
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{ -1.f, -1.f,  1.f }, .uv = { 0.f, 1.f }, .normal = {  0.f,  0.f,  1.f }, .tangent = { }, .bitangent = { } }),
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{  1.f, -1.f,  1.f }, .uv = { 1.f, 1.f }, .normal = {  0.f,  0.f,  1.f }, .tangent = { }, .bitangent = { } }),
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{  1.f,  1.f,  1.f }, .uv = { 1.f, 0.f }, .normal = {  0.f,  0.f,  1.f }, .tangent = { }, .bitangent = { } }),
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{ -1.f,  1.f,  1.f }, .uv = { 0.f, 0.f }, .normal = {  0.f,  0.f,  1.f }, .tangent = { }, .bitangent = { } }),
+				// back									   
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{ -1.f, -1.f, -1.f }, .uv = { 0.f, 1.f }, .normal = {  0.f,  0.f, -1.f }, .tangent = { }, .bitangent = { } }),
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{ -1.f,  1.f, -1.f }, .uv = { 1.f, 1.f }, .normal = {  0.f,  0.f, -1.f }, .tangent = { }, .bitangent = { } }),
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{  1.f,  1.f, -1.f }, .uv = { 1.f, 0.f }, .normal = {  0.f,  0.f, -1.f }, .tangent = { }, .bitangent = { } }),
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{  1.f, -1.f, -1.f }, .uv = { 0.f, 0.f }, .normal = {  0.f,  0.f, -1.f }, .tangent = { }, .bitangent = { } }),
+				// left									   
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{ -1.f, -1.f,  1.f }, .uv = { 0.f, 1.f }, .normal = { -1.f,  0.f,  0.f }, .tangent = { }, .bitangent = { } }),
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{ -1.f,  1.f,  1.f }, .uv = { 1.f, 1.f }, .normal = { -1.f,  0.f,  0.f }, .tangent = { }, .bitangent = { } }),
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{ -1.f,  1.f, -1.f }, .uv = { 1.f, 0.f }, .normal = { -1.f,  0.f,  0.f }, .tangent = { }, .bitangent = { } }),
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{ -1.f, -1.f, -1.f }, .uv = { 0.f, 0.f }, .normal = { -1.f,  0.f,  0.f }, .tangent = { }, .bitangent = { } }),
+				// right								   
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{  1.f, -1.f,  1.f }, .uv = { 0.f, 1.f }, .normal = {  1.f,  0.f,  0.f }, .tangent = { }, .bitangent = { } }),
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{  1.f, -1.f, -1.f }, .uv = { 1.f, 1.f }, .normal = {  1.f,  0.f,  0.f }, .tangent = { }, .bitangent = { } }),
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{  1.f,  1.f, -1.f }, .uv = { 1.f, 0.f }, .normal = {  1.f,  0.f,  0.f }, .tangent = { }, .bitangent = { } }),
+				mesh.add_vertex(Vertex{ .position = glm::vec3{ half_x, half_y, half_z } * glm::vec3{  1.f,  1.f,  1.f }, .uv = { 0.f, 0.f }, .normal = {  1.f,  0.f,  0.f }, .tangent = { }, .bitangent = { } }),
 			};
-			mesh.triangles = {
-				MeshIndexedTriangle{ 0 + 0, 1 + 0, 2 + 0, },	// down
-				MeshIndexedTriangle{ 2 + 0, 3 + 0, 0 + 0, },
-				MeshIndexedTriangle{ 0 + 4, 1 + 4, 2 + 4, },	// up
-				MeshIndexedTriangle{ 2 + 4, 3 + 4, 0 + 4, },
-				MeshIndexedTriangle{ 0 + 8, 1 + 8, 2 + 8, },	// front
-				MeshIndexedTriangle{ 2 + 8, 3 + 8, 0 + 8, },
-				MeshIndexedTriangle{ 0 + 12, 1 + 12, 2 + 12, },	// back
-				MeshIndexedTriangle{ 2 + 12, 3 + 12, 0 + 12, },
-				MeshIndexedTriangle{ 0 + 16, 1 + 16, 2 + 16, },	// left
-				MeshIndexedTriangle{ 2 + 16, 3 + 16, 0 + 16, },
-				MeshIndexedTriangle{ 0 + 20, 1 + 20, 2 + 20, },	// right
-				MeshIndexedTriangle{ 2 + 20, 3 + 20, 0 + 20, },
+			{
+				mesh.add_triangle(v[0] + v[ 0], v[1] + v[ 0], v[2] + v[ 0]);	// down
+				mesh.add_triangle(v[2] + v[ 0], v[3] + v[ 0], v[0] + v[ 0]);
+				mesh.add_triangle(v[0] + v[ 4], v[1] + v[ 4], v[2] + v[ 4]);	// up
+				mesh.add_triangle(v[2] + v[ 4], v[3] + v[ 4], v[0] + v[ 4]);
+				mesh.add_triangle(v[0] + v[ 8], v[1] + v[ 8], v[2] + v[ 8]);	// front
+				mesh.add_triangle(v[2] + v[ 8], v[3] + v[ 8], v[0] + v[ 8]);
+				mesh.add_triangle(v[0] + v[12], v[1] + v[12], v[2] + v[12]);	// back
+				mesh.add_triangle(v[2] + v[12], v[3] + v[12], v[0] + v[12]);
+				mesh.add_triangle(v[0] + v[16], v[1] + v[16], v[2] + v[16]);	// left
+				mesh.add_triangle(v[2] + v[16], v[3] + v[16], v[0] + v[16]);
+				mesh.add_triangle(v[0] + v[20], v[1] + v[20], v[2] + v[20]);	// right
+				mesh.add_triangle(v[2] + v[20], v[3] + v[20], v[0] + v[20]);
 			};
 			return mesh;
 		}
@@ -326,7 +346,10 @@ namespace arx
 			if (rings < 2) rings = 2;
 			if (segments < 3) segments = 3;
 
-			auto v0 = mesh.addVertex(Vertex{ {  0.f,  radius,  0.f }, { }, {  0.f,  1.f,  0.f }, { }, { } });
+			std::vector<uint32_t> v;
+
+			auto v0 = mesh.add_vertex(Vertex{ {  0.f,  radius,  0.f }, { }, {  0.f,  1.f,  0.f }, { }, { } });
+			v.push_back(v0);
 
 			for (uint32_t i = 0; i < rings - 1; ++i)
 			{
@@ -337,20 +360,21 @@ namespace arx
 					auto x = glm::sin(phi) * glm::cos(theta);
 					auto y = glm::cos(phi);
 					auto z = glm::sin(phi) * glm::sin(theta);
-					mesh.addVertex(Vertex{ radius * glm::vec3{ x, y, z }, { }, glm::normalize(glm::vec3{ x, y, z }), { }, { } });
+					v.push_back(mesh.add_vertex(Vertex{ radius * glm::vec3{ x, y, z }, { }, glm::normalize(glm::vec3{ x, y, z }), { }, { } }));
 				}
 			}
 
-			auto v1 = mesh.addVertex(Vertex{ {  0.f, -radius,  0.f }, { }, {  0.f, -1.f,  0.f }, { }, { } });
+			auto v1 = mesh.add_vertex(Vertex{ {  0.f, -radius,  0.f }, { }, {  0.f, -1.f,  0.f }, { }, { } });
+			v.push_back(v1);
 
 			for (uint32_t i = 0; i < segments; ++i)
 			{
 				auto i0 = i + 1;
 				auto i1 = (i + 1) % segments + 1;
-				mesh.addTriangle(v0, i1, i0);
+				mesh.add_triangle(v0, v[i1], v[i0]);
 				i0 = i + segments * (rings - 2) + 1;
 				i1 = (i + 1) % segments + segments * (rings - 2) + 1;
-				mesh.addTriangle(v1, i0, i1);
+				mesh.add_triangle(v1, v[i0], v[i1]);
 			}
 
 			for (uint32_t j = 0; j < rings - 2; ++j)
@@ -363,8 +387,8 @@ namespace arx
 					auto i1 = j0 + (i + 1) % segments;
 					auto i2 = j1 + (i + 1) % segments;
 					auto i3 = j1 + i;
-					mesh.addTriangle(i0, i1, i2);
-					mesh.addTriangle(i2, i3, i0);
+					mesh.add_triangle(v[i0], v[i1], v[i2]);
+					mesh.add_triangle(v[i2], v[i3], v[i0]);
 				}
 			}
 
@@ -378,22 +402,22 @@ namespace arx
 			const float b = 1.0f / phi;
 
 			// Icosahedron.
-			mesh.vertices = {
-				Vertex{ glm::normalize(glm::vec3{  0,  b, -a }), { }, glm::normalize(glm::vec3{  0,  b, -a }), { }, { } },
-				Vertex{ glm::normalize(glm::vec3{  b,  a,  0 }), { }, glm::normalize(glm::vec3{  b,  a,  0 }), { }, { } },
-				Vertex{ glm::normalize(glm::vec3{ -b,  a,  0 }), { }, glm::normalize(glm::vec3{ -b,  a,  0 }), { }, { } },
-				Vertex{ glm::normalize(glm::vec3{  0,  b,  a }), { }, glm::normalize(glm::vec3{  0,  b,  a }), { }, { } },
-				Vertex{ glm::normalize(glm::vec3{  0, -b,  a }), { }, glm::normalize(glm::vec3{  0, -b,  a }), { }, { } },
-				Vertex{ glm::normalize(glm::vec3{ -a,  0,  b }), { }, glm::normalize(glm::vec3{ -a,  0,  b }), { }, { } },
-				Vertex{ glm::normalize(glm::vec3{  0, -b, -a }), { }, glm::normalize(glm::vec3{  0, -b, -a }), { }, { } },
-				Vertex{ glm::normalize(glm::vec3{  a,  0, -b }), { }, glm::normalize(glm::vec3{  a,  0, -b }), { }, { } },
-				Vertex{ glm::normalize(glm::vec3{  a,  0,  b }), { }, glm::normalize(glm::vec3{  a,  0,  b }), { }, { } },
-				Vertex{ glm::normalize(glm::vec3{ -a,  0, -b }), { }, glm::normalize(glm::vec3{ -a,  0, -b }), { }, { } },
-				Vertex{ glm::normalize(glm::vec3{  b, -a,  0 }), { }, glm::normalize(glm::vec3{  b, -a,  0 }), { }, { } },
-				Vertex{ glm::normalize(glm::vec3{ -b, -a,  0 }), { }, glm::normalize(glm::vec3{ -b, -a,  0 }), { }, { } },
+			std::vector<Vertex> vertices = {
+				Vertex{ .position = glm::normalize(glm::vec3{  0,  b, -a }), .uv = { }, .normal = glm::normalize(glm::vec3{  0,  b, -a }), .tangent = { }, .bitangent = { } },
+				Vertex{ .position = glm::normalize(glm::vec3{  b,  a,  0 }), .uv = { }, .normal = glm::normalize(glm::vec3{  b,  a,  0 }), .tangent = { }, .bitangent = { } },
+				Vertex{ .position = glm::normalize(glm::vec3{ -b,  a,  0 }), .uv = { }, .normal = glm::normalize(glm::vec3{ -b,  a,  0 }), .tangent = { }, .bitangent = { } },
+				Vertex{ .position = glm::normalize(glm::vec3{  0,  b,  a }), .uv = { }, .normal = glm::normalize(glm::vec3{  0,  b,  a }), .tangent = { }, .bitangent = { } },
+				Vertex{ .position = glm::normalize(glm::vec3{  0, -b,  a }), .uv = { }, .normal = glm::normalize(glm::vec3{  0, -b,  a }), .tangent = { }, .bitangent = { } },
+				Vertex{ .position = glm::normalize(glm::vec3{ -a,  0,  b }), .uv = { }, .normal = glm::normalize(glm::vec3{ -a,  0,  b }), .tangent = { }, .bitangent = { } },
+				Vertex{ .position = glm::normalize(glm::vec3{  0, -b, -a }), .uv = { }, .normal = glm::normalize(glm::vec3{  0, -b, -a }), .tangent = { }, .bitangent = { } },
+				Vertex{ .position = glm::normalize(glm::vec3{  a,  0, -b }), .uv = { }, .normal = glm::normalize(glm::vec3{  a,  0, -b }), .tangent = { }, .bitangent = { } },
+				Vertex{ .position = glm::normalize(glm::vec3{  a,  0,  b }), .uv = { }, .normal = glm::normalize(glm::vec3{  a,  0,  b }), .tangent = { }, .bitangent = { } },
+				Vertex{ .position = glm::normalize(glm::vec3{ -a,  0, -b }), .uv = { }, .normal = glm::normalize(glm::vec3{ -a,  0, -b }), .tangent = { }, .bitangent = { } },
+				Vertex{ .position = glm::normalize(glm::vec3{  b, -a,  0 }), .uv = { }, .normal = glm::normalize(glm::vec3{  b, -a,  0 }), .tangent = { }, .bitangent = { } },
+				Vertex{ .position = glm::normalize(glm::vec3{ -b, -a,  0 }), .uv = { }, .normal = glm::normalize(glm::vec3{ -b, -a,  0 }), .tangent = { }, .bitangent = { } },
 			};
 
-			std::vector<MeshIndexedTriangle> readList = {
+			std::vector<MeshIndexedTriangle> read_list = {
 				{  2,  1,  0 },
 				{  1,  2,  3 },
 				{  5,  4,  3 },
@@ -416,7 +440,7 @@ namespace arx
 				{ 10,  8,  4 },
 			};
 
-			std::vector<MeshIndexedTriangle> writeList;
+			std::vector<MeshIndexedTriangle> write_list;
 
 			auto midpoint = [](const Vertex& va, const Vertex& vb)
 			{
@@ -426,37 +450,47 @@ namespace arx
 
 			while (level--)
 			{
-				writeList.clear();
+				write_list.clear();
 
-				for (auto& triangle : readList)
+				for (auto& triangle : read_list)
 				{
 					auto [v1, v2, v3] = triangle;
-					auto va = mesh.addVertex(midpoint(mesh.vertices[v1], mesh.vertices[v2]));
-					auto vb = mesh.addVertex(midpoint(mesh.vertices[v2], mesh.vertices[v3]));
-					auto vc = mesh.addVertex(midpoint(mesh.vertices[v3], mesh.vertices[v1]));
+					auto va = vertices.size();
+					vertices.push_back(midpoint(vertices[v1], vertices[v2]));
+					auto vb = vertices.size();
+					vertices.push_back(midpoint(vertices[v2], vertices[v3]));
+					auto vc = vertices.size();
+					vertices.push_back(midpoint(vertices[v3], vertices[v1]));
 
-					writeList.push_back({ v1, va, vc });
-					writeList.push_back({ v2, vb, va });
-					writeList.push_back({ v3, vc, vb });
-					writeList.push_back({ va, vb, vc });
+					write_list.push_back({ v1, va, vc });
+					write_list.push_back({ v2, vb, va });
+					write_list.push_back({ v3, vc, vb });
+					write_list.push_back({ va, vb, vc });
 				}
 
-				readList = std::move(writeList);
+				read_list = std::move(write_list);
 			}
 
-			for (auto& v : mesh.vertices)
+			std::vector<uint32_t> v;
+			v.reserve(vertices.size());
+			for (auto& vertex : vertices)
 			{
-				v.position *= radius;
+				vertex.position *= radius;
+				v.push_back(mesh.add_vertex(vertex));
 			}
-			mesh.triangles = std::move(readList);
+
+			for (auto& triangle : read_list)
+			{
+				mesh.add_triangle(v[std::get<0>(triangle)], v[std::get<1>(triangle)], v[std::get<2>(triangle)]);
+			}
 
 			return mesh;
 		}
-		static MeshBuilder Cone(float bottomRadius, float topRadius, float height, uint32_t segments) {
+		static MeshBuilder Cone(float bottom_radius, float top_radius, float height, uint32_t segments) {
 			MeshBuilder mesh;
 
 			if (segments < 3) segments = 3;
-			if (bottomRadius < 0.f || topRadius < 0.f || height <= 0.f)
+			if (bottom_radius < 0.f || top_radius < 0.f || height <= 0.f)
 			{
 				throw std::runtime_error("Invalid input parameters for a Cone.");
 			}
@@ -464,56 +498,57 @@ namespace arx
 			const float top = height / 2;
 			const float bottom = -height / 2;
 
+			std::vector<uint32_t> v;
 
 			// Top.
 			for (uint32_t i = 0; i < segments; ++i)
 			{
 				auto theta = 2.f * glm::pi<float>() * i / segments;
-				auto x = glm::cos(theta) * topRadius;
+				auto x = glm::cos(theta) * top_radius;
 				auto y = top;
-				auto z = glm::sin(theta) * topRadius;
-				mesh.vertices.push_back(Vertex{ glm::vec3{ x, y, z }, { }, {  0.f,  1.f,  0.f }, { }, { } });
+				auto z = glm::sin(theta) * top_radius;
+				v.push_back(mesh.add_vertex(Vertex{ glm::vec3{ x, y, z }, { }, {  0.f,  1.f,  0.f }, { }, { } }));
 			}
 			for (uint32_t i = 1; i < segments - 1; ++i)
 			{
-				mesh.addTriangle(0, i + 1, i);
+				mesh.add_triangle(v[0], v[i + 1], v[i]);
 			}
 
 			// Bottom.
 			for (uint32_t i = 0; i < segments; ++i)
 			{
 				auto theta = 2.f * glm::pi<float>() * i / segments;
-				auto x = glm::cos(theta) * bottomRadius;
+				auto x = glm::cos(theta) * bottom_radius;
 				auto y = bottom;
-				auto z = glm::sin(theta) * bottomRadius;
-				mesh.vertices.push_back(Vertex{ glm::vec3{ x, y, z }, { }, {  0.f, -1.f,  0.f }, { }, { } });
+				auto z = glm::sin(theta) * bottom_radius;
+				v.push_back(mesh.add_vertex(Vertex{ glm::vec3{ x, y, z }, { }, {  0.f, -1.f,  0.f }, { }, { } }));
 			}
 			for (uint32_t i = 1; i < segments - 1; ++i)
 			{
-				mesh.addTriangle(segments + 0, segments + i, segments + i + 1);
+				mesh.add_triangle(v[segments + 0], v[segments + i], v[segments + i + 1]);
 			}
 
 			// Lateral.
 			for (uint32_t i = 0; i < segments; ++i)
 			{
-				auto vt = mesh.getVertex(i);
-				auto vb = mesh.getVertex(segments + i);
+				auto vt = mesh.get_vertex(v[i]);
+				auto vb = mesh.get_vertex(v[segments + i]);
 				auto segment = vt.position - vb.position;
 				auto plane = glm::normalize(glm::cross(vt.position, vb.position));
 				auto normal = glm::normalize(glm::cross(plane, segment));
 				vt.normal = normal;
 				vb.normal = normal;
-				mesh.vertices.push_back(vt);
-				mesh.vertices.push_back(vb);
+				v.push_back(mesh.add_vertex(vt));
+				v.push_back(mesh.add_vertex(vb));
 			}
 			for (uint32_t i = 0; i < segments; ++i)
 			{
-				auto v1 = 2 * segments + 2 * i + 0;
-				auto v2 = 2 * segments + 2 * ((i + 1) % segments) + 0;
-				auto v3 = 2 * segments + 2 * ((i + 1) % segments) + 1;
-				auto v4 = 2 * segments + 2 * i + 1;
-				mesh.addTriangle(v1, v2, v3);
-				mesh.addTriangle(v3, v4, v1);
+				auto v1 = v[2 * segments + 2 * i + 0];
+				auto v2 = v[2 * segments + 2 * ((i + 1) % segments) + 0];
+				auto v3 = v[2 * segments + 2 * ((i + 1) % segments) + 1];
+				auto v4 = v[2 * segments + 2 * i + 1];
+				mesh.add_triangle(v1, v2, v3);
+				mesh.add_triangle(v3, v4, v1);
 			}
 
 			return mesh;
@@ -522,9 +557,9 @@ namespace arx
 	private:
 		std::vector<Vertex> vertices;
 		std::vector<IndexedTriangle> triangles;
-		std::unordered_map<Vertex, uint32_t> uniqueVertices;
-		std::unordered_map<IndexedTriangle, uint32_t> uniqueTriangles;
-		std::unordered_set<uint32_t> removedVertices;
-		std::unordered_set<uint32_t> removeTriangles;
+		std::unordered_map<Vertex, uint32_t> unique_vertices;
+		std::unordered_map<IndexedTriangle, uint32_t> unique_triangles;
+		std::unordered_set<uint32_t> removed_vertices;
+		std::unordered_set<uint32_t> removed_triangles;
 	};
 }

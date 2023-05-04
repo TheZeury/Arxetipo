@@ -18,6 +18,7 @@ namespace arx
 			},
 			resources{
 				.cone_model = renderer->create_mesh_model(arx::MeshBuilder::Cone(0.01f, 0.05f, 0.1f, 16)),
+				.uv_sphere_model = renderer->create_mesh_model(arx::MeshBuilder::UVSphere(0.2f, 16, 16)),
 				.font = renderer->create_bitmap("C:\\Windows\\Fonts\\CascadiaMono.ttf", 1024, 1024, 150), // TODO, temperary, this font does not always exist.
 			},
 			entities{
@@ -72,9 +73,9 @@ namespace arx
 										glm::mat4{ 1.f }
 									),
 								}
-							),
-							&entities.xr_controllers.right.transform,
-							true
+								),
+								& entities.xr_controllers.right.transform,
+									true
 						},
 						.association = ActorTransformAssociation{ &entities.xr_controllers.right.rigid_static, &entities.xr_controllers.right.transform },
 						},
@@ -116,7 +117,7 @@ namespace arx
 							true
 						},
 						.association = ActorTransformAssociation{ &entities.panel.button_a.rigid_dynamic, &entities.panel.button_a.transform },
-						.button = Button ({
+						.button = Button({
 							.actor_component = &entities.panel.button_a.rigid_dynamic,
 							.keep_activated = false,
 							.pushable = true,
@@ -148,6 +149,23 @@ namespace arx
 							.pushable = true,
 							.bottom_depth = 0.01f,
 						}),
+					},
+					.button_c = {
+						.transform = SpaceTransform{
+							{ 0.f, -0.1f, 0.001f },
+							&entities.panel.transform,
+						},
+						.button = presets::BlankBoxButton{
+							renderer,
+							physics_engine,
+							presets::BlankBoxButton::Settings{
+								.transform = &entities.panel.button_c.transform,
+								.half_extent = { 0.02f, 0.01f, 0.005f },
+								.text = "Button",
+								.font = resources.font,
+								.debug_visualized = true,
+							}
+						}
 					},
 					.slider = {
 						.transform = SpaceTransform{
@@ -198,7 +216,7 @@ namespace arx
 				.test_sphere = {
 					.transform = SpaceTransform{ { 0.f, 10.f, -2.f } },
 					.mesh_model = MeshModelComponent{ 
-						renderer->defaults.sample_sphere, 
+						resources.uv_sphere_model, 
 						renderer->defaults.default_material, 
 						&entities.test_sphere.transform 
 					},
@@ -226,6 +244,7 @@ namespace arx
 			entities.panel.button_a.rigid_dynamic.register_to_systems(&systems.graphics_system);
 			entities.panel.button_b.mesh_model.register_to_systems(&systems.graphics_system);
 			entities.panel.button_b.rigid_dynamic.register_to_systems(&systems.graphics_system);
+			entities.panel.button_c.button.register_to_systems(&systems.graphics_system);
 			entities.panel.slider.mesh_model.register_to_systems(&systems.graphics_system);
 			entities.panel.slider.rigid_dynamic.register_to_systems(&systems.graphics_system);
 			entities.plane.rigid_static.register_to_systems(&systems.graphics_system);
@@ -240,6 +259,7 @@ namespace arx
 			entities.xr_controllers.right.grab_interactor.register_to_systems(&systems.xr_system);
 			entities.panel.button_a.button.register_to_systems(&systems.xr_system);
 			entities.panel.button_b.button.register_to_systems(&systems.xr_system);
+			entities.panel.button_c.button.register_to_systems(&systems.xr_system);
 			entities.panel.slider.slider.register_to_systems(&systems.xr_system);
 			entities.panel.grab_interactable.register_to_systems(&systems.xr_system);
 			entities.test_sphere.point_interactable.register_to_systems(&systems.xr_system);
@@ -253,6 +273,7 @@ namespace arx
 			entities.panel.button_a.association.register_to_systems(&systems.physics_system);
 			entities.panel.button_b.rigid_dynamic.register_to_systems(&systems.physics_system);
 			entities.panel.button_b.association.register_to_systems(&systems.physics_system);
+			entities.panel.button_c.button.register_to_systems(&systems.physics_system);
 			entities.panel.slider.rigid_dynamic.register_to_systems(&systems.physics_system);
 			entities.panel.slider.association.register_to_systems(&systems.physics_system);
 			entities.panel.rigid_dynamic.register_to_systems(&systems.physics_system);
@@ -268,6 +289,12 @@ namespace arx
 				fundations.renderer->debug_mode = VulkanRenderer::DebugMode::OnlyDebug;
 			};
 			entities.panel.button_b.button.on_release = [&]() {
+				fundations.renderer->debug_mode = VulkanRenderer::DebugMode::Mixed;
+			};
+			entities.panel.button_c.button.on_press = [&]() {
+				fundations.renderer->debug_mode = VulkanRenderer::DebugMode::NoDebug;
+			};
+			entities.panel.button_c.button.on_release = [&]() {
 				fundations.renderer->debug_mode = VulkanRenderer::DebugMode::Mixed;
 			};
 		}
@@ -292,6 +319,7 @@ namespace arx
 
 		struct {
 			MeshModel* cone_model;
+			MeshModel* uv_sphere_model;
 			Bitmap* font;
 		} resources;
 
@@ -339,6 +367,10 @@ namespace arx
 					ActorTransformAssociation association;
 					Button button;
 				} button_b;
+				struct {
+					SpaceTransform transform;
+					presets::BlankBoxButton button;
+				} button_c;
 				struct {
 					SpaceTransform transform;
 					MeshModelComponent mesh_model;
