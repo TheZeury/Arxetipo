@@ -107,6 +107,9 @@ namespace arx
 			settings{ std::move(settings) }
 		{
 			slider_actor->setActorFlag(physx::PxActorFlag::eDISABLE_GRAVITY, true);
+			auto x = left + value * (right - left);
+			glm::vec4 translate{ x, 0.f, 0.f, 1.f };
+			slider_transform->set_local_position(anchor_transform.get_local_matrix() * translate);
 		}
 
 	private: // States.

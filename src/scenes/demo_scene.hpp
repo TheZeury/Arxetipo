@@ -96,7 +96,7 @@ namespace arx
 							renderer,
 							Text::Settings{
 								.transform = &entities.panel.text.transform,
-								.content = "Hello, World",
+								.content = std::to_string(0.f),
 								.font = resources.font,
 								.height = 0.05f,
 								.anchor = { 0.5f, 0.5f },
@@ -166,8 +166,6 @@ namespace arx
 							presets::BlankBoxButton::Settings{
 								.transform = &entities.panel.button_c.transform,
 								.half_extent = { 0.02f, 0.01f, 0.005f },
-								.text = "Button",
-								.font = resources.font,
 								.debug_visualized = true,
 							}
 						}
@@ -194,7 +192,7 @@ namespace arx
 						.slider = Slider({
 							.actor_component = &entities.panel.slider.rigid_dynamic,
 							.no_invoke_before_releasing = true,
-							.initial_value = 0.5f,
+							.initial_value = 0.0f,
 							.length = 0.2f,
 						}),
 					},
@@ -208,6 +206,17 @@ namespace arx
 						false,
 					},
 					.grab_interactable = XRGrabInteractable{ &entities.panel.rigid_dynamic, true },
+				},
+				.typewriter = {
+					.transform = SpaceTransform{ { 0.f, 1.f, -0.2f } },
+					.typewriter = presets::Typewriter(renderer, physics_engine, presets::Typewriter::Settings{
+						.transform = &entities.typewriter.transform,
+						.layout = presets::Typewriter::Layout::Dvorak,
+						.key_half_extent = { 0.015f, 0.015f, 0.005f },
+						.key_space = { 0.035f, 0.035f },
+						.font = resources.font,
+						.debug_visualized = true
+					}),
 				},
 				.plane = {
 					.rigid_static = RigidStaticComponent{
@@ -253,6 +262,7 @@ namespace arx
 			entities.panel.slider.mesh_model.register_to_systems(&systems.graphics_system);
 			entities.panel.slider.rigid_dynamic.register_to_systems(&systems.graphics_system);
 			entities.plane.rigid_static.register_to_systems(&systems.graphics_system);
+			entities.typewriter.typewriter.register_to_systems(&systems.graphics_system);
 			entities.test_sphere.mesh_model.register_to_systems(&systems.graphics_system);
 			entities.test_sphere.rigid_dynamic.register_to_systems(&systems.graphics_system);
 
@@ -267,6 +277,7 @@ namespace arx
 			entities.panel.button_c.button.register_to_systems(&systems.xr_system);
 			entities.panel.slider.slider.register_to_systems(&systems.xr_system);
 			entities.panel.grab_interactable.register_to_systems(&systems.xr_system);
+			entities.typewriter.typewriter.register_to_systems(&systems.xr_system);
 			entities.test_sphere.point_interactable.register_to_systems(&systems.xr_system);
 			entities.test_sphere.grab_interactable.register_to_systems(&systems.xr_system);
 
@@ -282,6 +293,7 @@ namespace arx
 			entities.panel.slider.rigid_dynamic.register_to_systems(&systems.physics_system);
 			entities.panel.slider.association.register_to_systems(&systems.physics_system);
 			entities.panel.rigid_dynamic.register_to_systems(&systems.physics_system);
+			entities.typewriter.typewriter.register_to_systems(&systems.physics_system);
 			entities.plane.rigid_static.register_to_systems(&systems.physics_system);
 			entities.test_sphere.rigid_dynamic.register_to_systems(&systems.physics_system);
 
@@ -296,11 +308,8 @@ namespace arx
 			entities.panel.button_b.button.on_release = [&]() {
 				fundations.renderer->debug_mode = VulkanRenderer::DebugMode::Mixed;
 			};
-			entities.panel.button_c.button.on_press = [&]() {
-				entities.panel.text.text.content_push_back('{');
-			};
-			entities.panel.button_c.button.on_release = [&]() {
-				entities.panel.text.text.content_push_back('}');
+			entities.panel.slider.slider.on_value_changed = [&](float value) {
+				entities.panel.text.text.set_content(std::to_string(value));
 			};
 		}
 
@@ -386,6 +395,10 @@ namespace arx
 				RigidDynamicComponent rigid_dynamic;
 				XRGrabInteractable grab_interactable;
 			} panel;
+			struct {
+				SpaceTransform transform;
+				presets::Typewriter typewriter;
+			} typewriter;
 			struct {
 				RigidStaticComponent rigid_static;
 			} plane;

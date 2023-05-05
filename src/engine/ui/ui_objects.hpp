@@ -8,3 +8,4 @@
 #include "ui_objects/button.hpp"
 #include "ui_objects/slider.hpp"
 #include "ui_objects/text.hpp"
+#include "ui_objects/typewriter.hpp"
