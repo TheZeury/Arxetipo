@@ -84,7 +84,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded affix "><a href="introduction.html">Introduction</a></li><li class="chapter-item expanded "><a href="foundations-and-objects.html"><strong aria-hidden="true">1.</strong> Foundations, Systems and Components</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="foundations-and-objects/foundation.html"><strong aria-hidden="true">1.1.</strong> Foundations</a></li><li class="chapter-item expanded "><a href="foundations-and-objects/system.html"><strong aria-hidden="true">1.2.</strong> Systems</a></li><li class="chapter-item expanded "><a href="foundations-and-objects/component.html"><strong aria-hidden="true">1.3.</strong> Components</a></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.</strong> XR Plugin</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">3.</strong> Renderer</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">4.</strong> Physics Engine</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">5.</strong> Command Runtime</div></li><li class="spacer"></li><li class="chapter-item expanded affix "><a href="beginner-guide-redirect.html">Beginner Guide</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded affix "><a href="introduction.html">Introduction</a></li><li class="chapter-item expanded "><a href="foundations-and-objects.html"><strong aria-hidden="true">1.</strong> Foundations, Systems and Components</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="foundations-and-objects/foundation.html"><strong aria-hidden="true">1.1.</strong> Foundations</a></li><li class="chapter-item expanded "><a href="foundations-and-objects/system.html"><strong aria-hidden="true">1.2.</strong> Systems</a></li><li class="chapter-item expanded "><a href="foundations-and-objects/component.html"><strong aria-hidden="true">1.3.</strong> Components</a></li></ol></li><li class="chapter-item expanded "><li class="part-title">Foundations</li><li class="chapter-item expanded "><div><strong aria-hidden="true">2.</strong> XR Plugin</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">3.</strong> Renderer</div></li><li class="chapter-item expanded "><div><strong aria-hidden="true">4.</strong> Physics Engine</div></li><li class="chapter-item expanded "><a href="command-runtime.html"><strong aria-hidden="true">5.</strong> Command Runtime</a></li><li class="chapter-item expanded affix "><li class="part-title">Objects</li><li class="chapter-item expanded "><div><strong aria-hidden="true">6.</strong> XR</div></li><li><ol class="section"><li class="chapter-item expanded "><div><strong aria-hidden="true">6.1.</strong> XR System</div></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">7.</strong> Graphics</div></li><li><ol class="section"><li class="chapter-item expanded "><div><strong aria-hidden="true">7.1.</strong> Graphics System</div></li></ol></li><li class="chapter-item expanded "><div><strong aria-hidden="true">8.</strong> Physics</div></li><li><ol class="section"><li class="chapter-item expanded "><div><strong aria-hidden="true">8.1.</strong> Physics System</div></li><li class="spacer"></li></ol></li><li class="chapter-item expanded "><a href="beginner-guide-redirect.html">Beginner Guide</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -401,6 +401,325 @@ else {
 	model_component.get&lt;MeshModelComponent&gt;().register_to_systems(&amp;graphics_systems);
 	// RigidDynamicComponent is not registered to graphics_systems.
 }
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="arxemando"><a class="header" href="#arxemando">Arxemando</a></h1>
+<h2 id="overview-1"><a class="header" href="#overview-1">Overview</a></h2>
+<p>Arxemando is a simple scripting language for Arxetipo Engine. It can serve several purposes, such as:</p>
+<ol>
+<li>In game command support for players.</li>
+<li>Hot-loading temporary logics from servers without updating the game.</li>
+<li>Writing some quick scripts for testing during development.</li>
+</ol>
+<p>It's designed to be dynamic, concise and &quot;just enough&quot; to use. It's not designed to be a full featured high performance programming language. To achieve high performance and functionality, developers still need to write real codes in C++.</p>
+<p>A major philosiphy of it's design is to not reserve any keywords, which may make it's syntax a little bit confusing at first.</p>
+<h2 id="how-to-excute"><a class="header" href="#how-to-excute">How to excute</a></h2>
+<p>To have a quick start, there's a completed CLI analyzer : src/lab_game/CommandTest.cpp. Compile it and run with one argument which is the path to a script file, or no argument to run in interactive mode.</p>
+<p>To integrate the analyzer into your program, options are:</p>
+<h3 id="option-1-using-provided-runtime"><a class="header" href="#option-1-using-provided-runtime">Option 1. Using provided runtime</a></h3>
+<p>Simply provide where the code is read from and where the output is written to (and optionally where the error is printed to) to the runtime and you are good to go.</p>
+<p><code>arx::CommandRuntime</code> provides some predefined identifiers like <code>print</code> and <code>exit</code> which can be used in command.</p>
+<pre><code class="language-cpp">#include &quot;../engine/command/command.hpp&quot;
+
+auto main() -&gt; int {
+    arx::CommandRuntime runtime{ std::cin, std::cout };
+    runtime.run();
+}
+</code></pre>
+<h3 id="option-2-manually"><a class="header" href="#option-2-manually">Option 2. Manually</a></h3>
+<p>Chain <code>kernel</code>, <code>parser</code>, and <code>lexer</code> together, pass the command to the lexer using <code>&lt;&lt;</code> operator.</p>
+<p>Tokens generated by the lexer will be passed to the parser, and the parser will generate AST which will be executed by the kernel.</p>
+<pre><code class="language-cpp">#include &quot;../engine/command/command.hpp&quot;
+
+auto main() -&gt; int {
+    arx::CommandKernel kernel;
+    arx::CommandParser parser{ kernel };
+    arx::CommandLexer lexer{ parser };
+
+    while (true) {
+        try {
+            std::string line;
+            std::getline(std::cin, line);
+            lexer &lt;&lt; line;
+        }
+        catch (const arx::CommandError&amp; e) {
+            std::cerr &lt;&lt; e.what() &lt;&lt; std::endl;
+        }
+    }
+}
+</code></pre>
+<p>There's no ostream needed because this is not a kernel feature, but more an implementation. You can implement your own <code>print</code> method like this:</p>
+<pre><code class="language-cpp">kernel.add_method(&quot;print&quot;, [&amp;](const std::vector&lt;CommandValue&gt;&amp; arguments, CommandValue&amp; result) {
+    for (const auto&amp; argument : arguments) {
+        std::cout &lt;&lt; argument.to_string() &lt;&lt; std::endl;
+    }
+    result = CommandValue{ CommandValue::Type::Empty, std::monostate{ } };
+}, true);
+</code></pre>
+<p>It is also possible to pass AST to the kernel directly without a parser, or pass tokens to the parser directly without a lexer. But most of the time you don't need to do that.</p>
+<pre><code class="language-cpp">using TokenType = arx::CommandToken::Type;
+
+std::vector&lt;arx::CommandToken&gt; tokens {
+    { TokenType::Name, &quot;print&quot; },
+    { TokenType::Separator, &quot;(&quot; },
+    { TokenType::Number, &quot;5&quot; },
+    { TokenType::Operator, &quot;+&quot; },
+    { TokenType::Number, &quot;10&quot; },
+    { TokenType::Separator, &quot;)&quot; },
+    { TokenType::Separator, &quot;;&quot; },
+};
+
+for (const auto&amp; token : tokens) {
+    parser &lt;&lt; token;
+}
+
+// Output: 15
+
+auto twenty = arx::CommandASTExpressionNode::make_number(20.f);
+auto three = arx::CommandASTExpressionNode::make_number(3.f);
+auto multiply = arx::CommandASTExpressionNode::make_operation(arx::CommandASTOperationNode::Type::Multiply, { });
+multiply.operations.push_back(std::move(twenty));
+multiply.operations.push_back(std::move(three));
+auto print = arx::CommandExpressionNode::make_method(&quot;print&quot;, { });
+print.arguments.push_back(std::move(multiply));
+auto statement = arx::CommandASTStatementNode::make_expression(std::move(print));
+
+kernel &lt;&lt; statement;
+
+// Output: 60
+</code></pre>
+<p>A practical usage of the full control is to get AST from the parser for other purposes.</p>
+<p>You can pass your interpreter to the parser as long as the type implemented <code>operator&lt;&lt;(const CommandASTStatementNode&amp;)</code>:</p>
+<pre><code class="language-cpp">struct MyInterpreter {
+    auto operator&lt;&lt;(const arx::CommandASTStatementNode&amp; statement) -&gt; MyInterpreter&amp; {
+        // ...
+    }
+};
+
+MyInterpreter interpreter;
+arx::CommandParser parser{ interpreter };
+arx::CommandLexer lexer{ parser };
+
+// ...
+</code></pre>
+<p>In fact there is a provided interpreter alternative called <code>arx::CommandFormatter</code> which prints formatted codes based on the AST:</p>
+<pre><code class="language-cpp">arx::CommandFormatter formatter{ output };
+arx::CommandParser parser{ formatter };
+arx::CommandLexer lexer{ parser };
+
+auto line = &quot;a=x     +30 /{&lt;&gt; * 3;}(5);print(a);&quot;;
+lexer &lt;&lt; line;
+
+// Output: 
+// a = x + 30 / {
+//     &lt; &gt; * 3;
+// }(5);
+</code></pre>
+<h2 id="syntax"><a class="header" href="#syntax">Syntax</a></h2>
+<h3 id="statements"><a class="header" href="#statements">Statements</a></h3>
+<h4 id="assignment"><a class="header" href="#assignment">Assignment</a></h4>
+<p><code>[identifier] = [expression];</code></p>
+<pre><code>a = 5;
+b = a;
+c = a + b + 5;
+myprint = print;
+d = ();
+</code></pre>
+<h4 id="single-expression"><a class="header" href="#single-expression">Single Expression</a></h4>
+<p><code>[expression];</code></p>
+<pre><code>a;
+print(a, 20);
+exit();
+</code></pre>
+<h4 id="fetch-argument"><a class="header" href="#fetch-argument">Fetch Argument</a></h4>
+<p><code>&gt;[identifier];</code></p>
+<p><code>&gt;&gt;&gt;&gt;&gt;&gt;[identifier]</code></p>
+<p><code>[identifier] = &gt;;</code> This is acutally a assignment but has the same effect.</p>
+<pre><code>&gt;a;
+b = &gt;;
+&gt;&gt;c; // c fetches an argument of the outer method.
+</code></pre>
+<h4 id="return"><a class="header" href="#return">Return</a></h4>
+<p><code>&lt;[expression]</code></p>
+<p>Multiple return is still not implemented, but it's a planned concept in the language.</p>
+<pre><code>&lt;a;
+&lt; a + 5;
+&lt;; // Implicitly return ().
+&lt;(); // Explicitly return ().
+&lt;&lt;; // Double return. Return two scopes with value ().
+&lt;&lt;&lt;&lt;&lt; 20; // Return five methods with the value 20.
+</code></pre>
+<h4 id="delete"><a class="header" href="#delete">Delete</a></h4>
+<p><code>#[identifier]</code></p>
+<pre><code>#a;
+#myprint;
+</code></pre>
+<h4 id="protect"><a class="header" href="#protect">Protect</a></h4>
+<pre><code>a = 5;
+a = 10; // Reassign is ok without protection.
+[a]; // Protect a.
+a = 20; // Error. Cannot be reassigned once it's protected.
+#a; // Error. Cannot be deleted once it's protected.
+
+{
+    a = 5;
+    {
+        [a];
+        a = 10; // Error. Cannot be reassigned once it's protected.
+        {
+            a = 15; // Error. a is protected in the outer scope.
+        }();
+    }();
+    a = 20; // Ok. Protection will be removed after the scope.
+}();
+</code></pre>
+<p>Wait for the protection going out of scope is the only way to remove a protection.</p>
+<p>So don't protect identifiers in the global scope unless you really know what you are doing.</p>
+<p>Some application defined identifiers are protected by default like <code>print</code> or <code>exit</code> in the global scope. Those identifier are impossible to be reassigned or deleted in command. But the application can do anything through command runtime :).</p>
+<h3 id="expressions"><a class="header" href="#expressions">Expressions</a></h3>
+<h4 id="number"><a class="header" href="#number">Number</a></h4>
+<p>Stored in 32-bit float.</p>
+<pre><code>3;
+50;
+-5;
+3.14;
+2.718281828459045;
+</code></pre>
+<h4 id="identifier"><a class="header" href="#identifier">Identifier</a></h4>
+<pre><code>a;
+b;
+print;
+exit;
+</code></pre>
+<h4 id="operation"><a class="header" href="#operation">Operation</a></h4>
+<pre><code>a + b;
+a + b * (c - d);
+() + 20; // 20
+() - 20; // -20
+5 * (); // ()
+() + (); // ()
+</code></pre>
+<p>Empty operation rules(<code>[expression]</code> can also be <code>()</code>):</p>
+<p><code>() + [expression] = [expression]</code></p>
+<p><code>[expression] + () = [expression]</code></p>
+<p><code>() - [expression] = -[expression]</code></p>
+<p><code>[expression - ()] = [expression]</code></p>
+<p><code>() * [expression] = ()</code></p>
+<p><code>[expression] * () = ()</code></p>
+<p><code>() / [expression] = ()</code></p>
+<p><code>[expression] / () = ()</code></p>
+<p>And any undefined operation will return <code>()</code>:</p>
+<p><code>[method] + 5 = ()</code></p>
+<p><code>[method] * [method] = ()</code></p>
+<p><code>-[method] = ()</code></p>
+<h4 id="method-call"><a class="header" href="#method-call">Method Call</a></h4>
+<p>A method is a <strong>value</strong> which can be assigned to a identifier.</p>
+<pre><code>print(a, b, c); // Return value: ()
+a = sin(3); // a = 0.1411200080598672
+mymethod = sin; // mymethod is now a alias method of sin.
+b = mymethod(6.28);
+</code></pre>
+<h4 id="argument"><a class="header" href="#argument">Argument</a></h4>
+<p>In a method call, each time a <code>&gt;</code> appears, it will have the value of the next argument.</p>
+<pre><code>&gt;; // By doing this, a argument is ignored;
+&gt;(); // If a argument is a method, you can do this.
+a = &gt;; // Already mentioned in the assignment section.
+</code></pre>
+<h4 id="method-body"><a class="header" href="#method-body">Method Body</a></h4>
+<p>A method body returns a <strong>method</strong> which is a value.
+A method body itself is <strong>not</strong> excuted, a method call is excuted.</p>
+<pre><code>add = { // Although assign it to a identifier is more common.
+    &gt;a;
+    &gt;b;
+    &lt; a + b;
+};
+print(add(3, 5));
+
+{ &lt; &gt; + &gt;; }(2, 3); // return 5.
+// Since a method body returns a method, it can be called directly if you would like to.
+</code></pre>
+<p>Notice: Methods are not closures, they don't have access to the environment where they are defined.</p>
+<h4 id="condition"><a class="header" href="#condition">Condition</a></h4>
+<p><code>[expression] ? [expression]</code></p>
+<p><code>[expression] ? [expression] : [expression]</code></p>
+<pre><code>b = a ? a + 1 : 0;
+</code></pre>
+<p>We can combine immediate method call with condition to achieve <code>if else</code> effect:</p>
+<pre><code>a ? {
+    print(a);
+}();
+
+a ? {
+    print(a);
+}() 
+: {
+    print(0);
+}();
+
+a ? {
+    print(a);
+}() 
+: b ? {
+    print(0);
+}() 
+: {
+    print(1);
+}();
+</code></pre>
+<p>Be careful that the parentheses following a method body is necessary, otherwise it will return a method as a value, and codes in the method body won't be excuted:</p>
+<pre><code>a = 5;
+
+m = a ? {
+    print(a);
+} : {
+    print(0);
+}; // Nothing printed, m is assigned with a method.
+
+m(); // 5 printed.
+</code></pre>
+<h4 id="self-call"><a class="header" href="#self-call">Self Call</a></h4>
+<p><code>$([arguments])</code></p>
+<p><code>$</code> means the method itself. By calling <code>$</code> at the end of a method body, we can achieve a loop.</p>
+<pre><code>a = 0;
+{
+    print(a);
+    a = a + 1;
+    10 - a ? $();
+}();
+// 0 1 2 3 4 5 6 7 8 9
+</code></pre>
+<h3 id="examples"><a class="header" href="#examples">Examples</a></h3>
+<h4 id="fibonacci"><a class="header" href="#fibonacci">Fibonacci</a></h4>
+<pre><code>fib = {
+    &gt;n;
+    &lt; n ? $(n - 1) + ( n - 1 ? $(n - 2) : 1 ) : 0;
+};
+
+print(fib(10)); // 55
+</code></pre>
+<pre><code>fib = {
+    &gt;n;
+    &lt; n ? {
+        &gt;i; &gt;a; &gt;b;
+        &lt; n - i ? $(i + 1, b, a + b) : a + b;
+    }(1, 1, 0) : 0;
+};
+
+print(fib(12)); // 144
+</code></pre>
+<h4 id="euclids-algorithm"><a class="header" href="#euclids-algorithm">Euclid's algorithm</a></h4>
+<pre><code>gcd = {
+    &gt;a;
+    &gt;b;
+    &lt; b ? $(b, a % b) : a;
+};
+
+print(gcd(10, 15)); // 5
+</code></pre>
+<h4 id="factorial"><a class="header" href="#factorial">Factorial</a></h4>
+<pre><code>fact = {
+    &gt;n;
+    &lt; n ? n * $(n - 1) : 1;
+};
 </code></pre>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="beginner-guide"><a class="header" href="#beginner-guide">Beginner Guide</a></h1>
 <p><a href="../beginner-guide/index.html">Arxetipo Beginner Guide</a></p>

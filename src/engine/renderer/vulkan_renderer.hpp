@@ -168,8 +168,8 @@ namespace arx
 			uint32_t mirrorImageIndex = (view == mirrorView && !iconified) ? device.acquireNextImageKHR(mirrorVkSwapchain, UINT64_MAX, mirrorImageAvailableSemaphore, {}).value : UINT32_MAX;
 #endif
 
-			//preservedModels[view].clear();
 			command_buffer.reset();
+			clear_to_delete();
 			vk::CommandBufferBeginInfo beginInfo{ };
 			command_buffer.begin(beginInfo);	// <======= Command Buffer Begin.
 
@@ -879,6 +879,23 @@ namespace arx
 			}
 
 			return create_ui_element(textVertices, indices);
+		}
+		
+		auto delete_ui_element(UIElement* ui_element) -> void {
+			ui_elements_to_delete.insert(ui_element);
+		}
+
+		auto delete_ui_element_immediate(UIElement* ui_element) -> void {
+			destroy_buffer(ui_element->index_buffer, ui_element->index_buffer_memory);
+			destroy_buffer(ui_element->vertex_buffer, ui_element->vertex_buffer_memory);
+		}
+
+		auto clear_to_delete() -> void {
+			for (auto ui_element : ui_elements_to_delete)
+			{
+				delete_ui_element_immediate(ui_element);
+			}
+			ui_elements_to_delete.clear();
 		}
 		
 	public:
@@ -1813,6 +1830,8 @@ namespace arx
 		vk::Semaphore draw_done;
 		std::vector<vk::Fence> in_flights;
 		std::vector<Swapchain*> swap_chains;
+
+		std::unordered_set<UIElement*> ui_elements_to_delete;
 
 #ifdef MIRROR_WINDOW
 		GLFWwindow* window = nullptr;

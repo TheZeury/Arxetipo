@@ -47,9 +47,7 @@ auto main() -> int {
 				throw arx::CommandException{ "`say` requires 1 argument." };
 			}
 			auto words = arguments[0].to_string();
-			scene->systems.graphics_system.remove_ui_element(scene->entities.panel.text.ui_element.ui_element, scene->entities.panel.text.ui_element.bitmap, scene->entities.panel.text.ui_element.transform);
-			scene->entities.panel.text.ui_element.ui_element = renderer.create_ui_text(words, 0.05f, scene->resources.font);
-			scene->entities.panel.text.ui_element.register_to_systems(&scene->systems.graphics_system);
+			scene->entities.panel.text.text.set_content(words);
 		}, true);
 
 		runtime.kernel.add_method("move", [&](const std::vector<arx::CommandValue>& arguments, arx::CommandValue& result) {

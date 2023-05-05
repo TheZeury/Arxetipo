@@ -455,11 +455,11 @@ namespace arx
 				for (auto& triangle : read_list)
 				{
 					auto [v1, v2, v3] = triangle;
-					auto va = vertices.size();
+					auto va = static_cast<uint32_t>(vertices.size());
 					vertices.push_back(midpoint(vertices[v1], vertices[v2]));
-					auto vb = vertices.size();
+					auto vb = static_cast<uint32_t>(vertices.size());
 					vertices.push_back(midpoint(vertices[v2], vertices[v3]));
-					auto vc = vertices.size();
+					auto vc = static_cast<uint32_t>(vertices.size());
 					vertices.push_back(midpoint(vertices[v3], vertices[v1]));
 
 					write_list.push_back({ v1, va, vc });

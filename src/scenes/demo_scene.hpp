@@ -92,11 +92,16 @@ namespace arx
 					},
 					.text = {
 						.transform = SpaceTransform{ { 0.f, 0.f, 0.001f }, &entities.panel.transform },
-						.ui_element = UIElementComponent{
-							renderer->create_ui_text("hello world", 0.05f, resources.font),
-							resources.font,
-							&entities.panel.text.transform
-						}
+						.text = Text{
+							renderer,
+							Text::Settings{
+								.transform = &entities.panel.text.transform,
+								.content = "Hello, World",
+								.font = resources.font,
+								.height = 0.05f,
+								.anchor = { 0.5f, 0.5f },
+							}
+						},
 					},
 					.button_a = {
 						.transform = SpaceTransform{
@@ -239,7 +244,7 @@ namespace arx
 			entities.xr_controllers.right.cone.register_to_systems(&systems.graphics_system);
 			entities.xr_controllers.right.rigid_static.register_to_systems(&systems.graphics_system);
 			entities.panel.ui_element.register_to_systems(&systems.graphics_system);
-			entities.panel.text.ui_element.register_to_systems(&systems.graphics_system);
+			entities.panel.text.text.register_to_systems(&systems.graphics_system);
 			entities.panel.button_a.mesh_model.register_to_systems(&systems.graphics_system);
 			entities.panel.button_a.rigid_dynamic.register_to_systems(&systems.graphics_system);
 			entities.panel.button_b.mesh_model.register_to_systems(&systems.graphics_system);
@@ -292,10 +297,10 @@ namespace arx
 				fundations.renderer->debug_mode = VulkanRenderer::DebugMode::Mixed;
 			};
 			entities.panel.button_c.button.on_press = [&]() {
-				fundations.renderer->debug_mode = VulkanRenderer::DebugMode::NoDebug;
+				entities.panel.text.text.content_push_back('{');
 			};
 			entities.panel.button_c.button.on_release = [&]() {
-				fundations.renderer->debug_mode = VulkanRenderer::DebugMode::Mixed;
+				entities.panel.text.text.content_push_back('}');
 			};
 		}
 
@@ -351,7 +356,7 @@ namespace arx
 				UIElementComponent ui_element;
 				struct {
 					SpaceTransform transform;
-					UIElementComponent ui_element;
+					Text text;
 				} text;
 				struct {
 					SpaceTransform transform;

@@ -197,10 +197,6 @@ namespace arx
 				}
 			}
 
-		public: // Callbacks.
-			std::function<void()>& on_press;
-			std::function<void()>& on_release;
-
 		public:
 			BlankBoxButton(VulkanRenderer* renderer, PhysXEngine* physics_engine, Settings&& settings) :
 				transform{ settings.transform },
@@ -232,8 +228,6 @@ namespace arx
 					.activating_factor = settings.activating_factor,
 					.switch_factor = settings.switch_factor,
 				} },
-				on_press{ button.on_press },
-				on_release{ button.on_release },
 				text{
 					.transform = SpaceTransform{ glm::vec3(0.f, 0.f, settings.half_extent.z * 2.f + 0.001f), transform },
 					.ui_element = UIElementComponent{
@@ -241,7 +235,9 @@ namespace arx
 						settings.font,
 						&text.transform,
 					}
-				}
+				},
+				on_press{ button.on_press },
+				on_release{ button.on_release }
 			{
 				button.on_press = std::move(settings.on_press);
 				button.on_release = std::move(settings.on_release);
@@ -257,6 +253,11 @@ namespace arx
 				SpaceTransform transform;
 				UIElementComponent ui_element;
 			} text;
+
+		public: // Callbacks.
+			std::function<void()>& on_press;
+			std::function<void()>& on_release;
 		};
+
 	}
 }

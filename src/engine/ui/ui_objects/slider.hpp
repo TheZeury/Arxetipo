@@ -98,9 +98,9 @@ namespace arx
 
 	public:
 		Slider(Settings&& settings) :
+			value{ settings.initial_value },
 			slider_transform{ settings.actor_component->transform },
 			slider_actor{ settings.actor_component->get_rigid_actor() },
-			value{ settings.initial_value },
 			anchor_transform{ slider_transform->get_local_matrix(), slider_transform->get_parent() },
 			left{ -settings.anchor * settings.length },
 			right{ (1.f - settings.anchor) * settings.length },
@@ -114,12 +114,12 @@ namespace arx
 		float offset_x = 0.0f;
 
 	public:
-		Settings settings;
 		SpaceTransform* slider_transform;
 		RigidActor* slider_actor;
 		SpaceTransform anchor_transform;
 		float left;
 		float right;
+		Settings settings;
 		XRSystem* xr_system;
 	};
 }

@@ -99,9 +99,10 @@ namespace arx
 #endif
 		}
 
-		auto add_ui_element(UIElement* element, Bitmap* bitmap, SpaceTransform* transform) -> void {
+		auto add_ui_element(UIElement* element, Bitmap* bitmap, SpaceTransform* transform) -> std::list<std::tuple<Bitmap*, UIElement*, glm::mat4*>>::iterator {
 			ui_elements.push_back({ bitmap, element, &(transform->global_matrix) });
 			transforms.insert(transform);
+			return std::prev(ui_elements.end());
 		}
 		auto remove_ui_element(UIElement* element, Bitmap* bitmap, SpaceTransform* transform) -> void {
 //#if defined(NDEBUG)
