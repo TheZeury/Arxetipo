@@ -209,7 +209,9 @@ namespace arx
 				},
 				.typewriter = {
 					.transform = SpaceTransform{ { 0.f, 1.f, -0.2f } },
+					.listener = presets::TextKeyListener{ &entities.panel.text.text },
 					.typewriter = presets::Typewriter(renderer, physics_engine, presets::Typewriter::Settings{
+						.listener = &entities.typewriter.listener,
 						.transform = &entities.typewriter.transform,
 						.layout = presets::Typewriter::Layout::Dvorak,
 						.key_half_extent = { 0.015f, 0.015f, 0.005f },
@@ -397,6 +399,7 @@ namespace arx
 			} panel;
 			struct {
 				SpaceTransform transform;
+				presets::TextKeyListener listener;
 				presets::Typewriter typewriter;
 			} typewriter;
 			struct {

@@ -101,13 +101,73 @@ namespace arx::presets
 		{ '9', "9" },
 	};
 
-	auto to_label(char c) -> std::string {
+	inline auto to_label(char c) noexcept -> std::string {
 		auto it = key_label.find(c);
 		if (it != key_label.end()) {
 			return it->second;
 		}
 		return "Error";
 	}
+
+	inline auto to_capital(char c) noexcept -> char {
+		if (c >= 'a' && c <= 'z') {
+			return c - 'a' + 'A';
+		}
+		return c;
+	}
+
+	struct KeyListener
+	{
+		virtual auto key_pressed(char key, void* source = nullptr) -> void = 0;
+		virtual auto key_released(char key, void* source = nullptr) -> void = 0;
+	};
+
+	struct TextKeyListener : public KeyListener
+	{
+	public:
+		template<typename Systems>
+		auto register_to_systems(Systems* systems) -> void {
+			// Do nothing.
+			// Maybe in the future, we can have an event system or something.
+		}
+
+	public:
+		auto key_pressed(char key, void* source = nullptr) -> void override {
+			if (key == 'C') {
+				caps_lock = true;
+			}
+			else if (key == 'S') {
+				shift = true;
+			}
+			else if (key == '\b') {
+				if (text != nullptr) {
+					text->content_pop_back();
+				}
+			}
+			else {
+				if (text != nullptr) {
+					text->content_push_back((caps_lock == shift) ? key : to_capital(key));
+				}
+			}
+		}
+		auto key_released(char key, void* source = nullptr) -> void override {
+
+		}
+
+	public:
+		auto set_text_component(Text* text) -> void {
+			this->text = text;
+		}
+
+	public:
+		TextKeyListener(Text* text) : text(text) {
+		}
+
+	private:
+		Text* text;
+		bool caps_lock = false;
+		bool shift = false;
+	};
 
 	struct TypewriterPart
 	{
@@ -122,6 +182,7 @@ namespace arx::presets
 		};
 
 		struct Settings {
+			KeyListener* listener = nullptr;
 			SpaceTransform* transform;
 			glm::vec3 key_half_extent; // extents of the models
 			glm::vec2 key_space; // extents of how much space each key occupies
@@ -176,6 +237,16 @@ namespace arx::presets
 						.keep_activated = key == 'C',
 						.pushable = true,
 						.debug_visualized = settings.debug_visualized,
+						.on_press = [this, key, listener = settings.listener]() {
+							if (listener) {
+								listener->key_pressed(key, this);
+							}
+						},
+						.on_release = [this, key, listener = settings.listener]() {
+							if (listener) {
+								listener->key_released(key, this);
+							}
+						}
 					});
 
 					key_transforms.push_back(std::move(key_transform));
@@ -184,6 +255,8 @@ namespace arx::presets
 			}
 
 			if (settings.navigation_key != NavigationKey::None) {
+				char key = static_cast<char>(settings.navigation_key);
+
 				auto key_transform = std::make_unique<SpaceTransform>(
 					glm::vec3{ 0.5f * board_extent.x, 0.5f * settings.key_space.y, 0.f } - real_anchor,
 					settings.transform
@@ -191,11 +264,21 @@ namespace arx::presets
 				auto key_button = std::make_unique<BlankBoxButton>(renderer, physics_engine, BlankBoxButton::Settings{
 					.transform = key_transform.get(),
 					.half_extent = glm::vec3{ board_extent.x * 0.5f - settings.key_space.x * 0.5f + settings.key_half_extent.x , settings.key_half_extent.y, settings.key_half_extent.z },
-					.text = to_label(static_cast<char>(settings.navigation_key)),
+					.text = to_label(key),
 					.font = settings.font,
 					.keep_activated = false,
 					.pushable = true,
 					.debug_visualized = settings.debug_visualized,
+					.on_press = [this, key, listener = settings.listener]() {
+						if (listener) {
+							listener->key_pressed(key, this);
+						}
+					},
+					.on_release = [this, key, listener = settings.listener]() {
+						if (listener) {
+							listener->key_released(key, this);
+						}
+					}
 				});
 				key_transforms.push_back(std::move(key_transform));
 				key_buttons.push_back(std::move(key_button));
@@ -220,6 +303,7 @@ namespace arx::presets
 		};
 
 		struct Settings {
+			KeyListener* listener = nullptr;
 			SpaceTransform* transform;
 			Layout layout;
 			glm::vec3 key_half_extent; // extents of the models
@@ -248,6 +332,7 @@ namespace arx::presets
 			right_part_transform{ settings.transform },
 			keypad_transform{ settings.transform },
 			typewriter_part_left(renderer, physics_engine, presets::TypewriterPart::Settings{
+				.listener = settings.listener,
 				.transform = &left_part_transform,
 				.key_half_extent = settings.key_half_extent,
 				.key_space = settings.key_space,
@@ -264,6 +349,7 @@ namespace arx::presets
 				.debug_visualized = settings.debug_visualized,
 			}),
 			typewriter_part_right(renderer, physics_engine, presets::TypewriterPart::Settings{
+				.listener = settings.listener,
 				.transform = &right_part_transform,
 				.key_half_extent = settings.key_half_extent,
 				.key_space = settings.key_space,
@@ -280,6 +366,7 @@ namespace arx::presets
 				.debug_visualized = settings.debug_visualized,
 			}),
 			typewriter_keypad(renderer, physics_engine, presets::TypewriterPart::Settings{
+				.listener = settings.listener,
 				.transform = &keypad_transform,
 				.key_half_extent = settings.key_half_extent,
 				.key_space = settings.key_space,

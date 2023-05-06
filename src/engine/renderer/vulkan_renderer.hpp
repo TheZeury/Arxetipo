@@ -1464,7 +1464,7 @@ namespace arx
 			vk::BufferUsageFlags usage_flags, vk::MemoryPropertyFlags memory_property_flags,
 			vk::DeviceSize min_offset_alignment = 1) -> std::tuple<vk::Buffer, vk::DeviceMemory>
 		{
-			vk::DeviceSize buffer_size = get_alignment(instance_size, min_offset_alignment) * instance_count;
+			vk::DeviceSize buffer_size = get_alignment(instance_size, min_offset_alignment) * (instance_count ? instance_count : 1);
 
 			// Buffer
 			vk::BufferCreateInfo buffer_info({ }, buffer_size, usage_flags, vk::SharingMode::eExclusive);
