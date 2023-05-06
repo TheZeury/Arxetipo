@@ -144,6 +144,14 @@ namespace arx::presets
 					text->content_pop_back();
 				}
 			}
+			else if (key == '\n') {
+				if (submittable && submit != nullptr) {
+					submit(text->get_content_ref());
+					if (clear_on_submit) {
+						text->set_content("");
+					}
+				}
+			}
 			else {
 				if (text != nullptr) {
 					text->content_push_back((caps_lock == shift) ? key : to_capital(key));
@@ -160,11 +168,19 @@ namespace arx::presets
 		}
 
 	public:
-		TextKeyListener(Text* text) : text(text) {
+		TextKeyListener(Text* text, bool submittable = false, std::function<void(const std::string&)> submit = nullptr, bool clear_on_submit = true) : 
+			text(text),
+			submittable(submittable),
+			submit(submit),
+			clear_on_submit(clear_on_submit)
+		{
 		}
 
 	private:
 		Text* text;
+		bool submittable;
+		bool clear_on_submit;
+		std::function<void(const std::string&)> submit;
 		bool caps_lock = false;
 		bool shift = false;
 	};

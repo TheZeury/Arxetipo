@@ -9,12 +9,13 @@ namespace arx
 		DemoScene(DemoScene&&) = delete;
 		DemoScene& operator=(DemoScene&&) = delete;
 
-		DemoScene(VulkanRenderer* renderer, OpenXRPlugin* xr_plugin, PhysXEngine* physics_engine) :
-			fundations{ renderer, xr_plugin, physics_engine },
+		DemoScene(VulkanRenderer* renderer, OpenXRPlugin* xr_plugin, PhysXEngine* physics_engine, CommandRuntime* command_runtime) :
+			fundations{ renderer, xr_plugin, physics_engine, command_runtime },
 			systems{
 				GraphicsSystem{ renderer, xr_plugin },
 				XRSystem{ xr_plugin },
-				PhysicsSystem{ physics_engine }
+				PhysicsSystem{ physics_engine },
+				CommandSystem{ command_runtime },
 			},
 			resources{
 				.cone_model = renderer->create_mesh_model(arx::MeshBuilder::Cone(0.01f, 0.05f, 0.1f, 16)),
@@ -209,7 +210,7 @@ namespace arx
 				},
 				.typewriter = {
 					.transform = SpaceTransform{ { 0.f, 1.f, -0.2f } },
-					.listener = presets::TextKeyListener{ &entities.panel.text.text },
+					.listener = presets::TextKeyListener{ &entities.panel.text.text, true, [&](const std::string& command) { systems.command_system.command(command); }},
 					.typewriter = presets::Typewriter(renderer, physics_engine, presets::Typewriter::Settings{
 						.listener = &entities.typewriter.listener,
 						.transform = &entities.typewriter.transform,
@@ -319,18 +320,21 @@ namespace arx
 			systems.graphics_system.mobilize();
 			systems.xr_system.mobilize();
 			systems.physics_system.mobilize();
+			systems.command_system.mobilize();
 		}
 
 		struct {
 			VulkanRenderer* renderer;
 			OpenXRPlugin* xr_plugin;
 			PhysXEngine* physics_engine;
+			CommandRuntime* command_runtime;
 		} fundations;
 
 		struct {
 			GraphicsSystem graphics_system;
 			XRSystem xr_system;
 			PhysicsSystem physics_system;
+			CommandSystem command_system;
 		} systems;
 
 		struct {

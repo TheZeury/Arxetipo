@@ -1501,7 +1501,7 @@ namespace arx
 		{
 			auto command_buffer = begin_single_time_command_buffer();
 
-			std::array<vk::BufferCopy, 1> buffer_copies = { vk::BufferCopy{ 0, 0, size } };
+			std::array<vk::BufferCopy, 1> buffer_copies = { vk::BufferCopy{ 0, 0, size ? size : 1 } };
 			command_buffer.copyBuffer(src_buffer, dst_buffer, buffer_copies);
 
 			end_single_time_command_buffer(command_buffer);

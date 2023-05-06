@@ -1,12 +1,13 @@
 ﻿#include "engine/renderer/vulkan_renderer.hpp"
 #include "engine/xr/openxr_plugin.hpp"
 #include "engine/physics/physx_engine.hpp"
+#include "engine/command/command.hpp"
 #include "engine/common_objects/common_objects.hpp"
 #include "engine/renderer/graphics_objects.hpp"
 #include "engine/xr/xr_objects.hpp"
 #include "engine/physics/physics_objects.hpp"
 #include "engine/ui/ui_objects.hpp"
-#include "engine/command/command.hpp"
+#include "engine/command/command_objects.hpp"
 
 #include <chrono>
 
@@ -17,16 +18,15 @@ auto main() -> int {
 		arx::VulkanRenderer renderer;
 		arx::OpenXRPlugin xr_plugin(renderer);
 		arx::PhysXEngine physics_engine;
+		arx::CommandRuntime runtime{ std::cin, std::cout };
 		auto proxy = xr_plugin.initialize();
 		renderer.initialize(proxy);
 		physics_engine.initialize();
 		xr_plugin.initialize_session(proxy);
 		renderer.initialize_session(proxy);
 
-		auto scene = new arx::DemoScene(&renderer, &xr_plugin, &physics_engine);
+		auto scene = new arx::DemoScene(&renderer, &xr_plugin, &physics_engine, &runtime);
 		scene->mobilize();
-
-		arx::CommandRuntime runtime{ std::cin, std::cout };
 		runtime.kernel.add_method("teleport", [&](const std::vector<arx::CommandValue>& arguments, arx::CommandValue& result) {
 			if (arguments.size() != 3) {
 				throw arx::CommandException{ "`teleport` requires 3 arguments. \nHint: `teleport` is used to set xr_offset. \nUsage: `teleport(x, y, z)`" };
@@ -91,9 +91,9 @@ auto main() -> int {
 			}
 		}, true);
 
-		std::jthread command_thread([&runtime]() {
-			runtime.run();
-		});
+		//std::jthread command_thread([&runtime]() {
+		//	runtime.run();
+		//});
 
 		auto start_time = std::chrono::high_resolution_clock::now();
 		auto last_time = start_time;
@@ -105,6 +105,8 @@ auto main() -> int {
 			float time_elapsed = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - start_time).count();
 			float time_delta = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - last_time).count();
 			last_time = currentTime;
+
+			scene->systems.command_system.update();
 
 			scene->systems.physics_system.set_time_delta(time_delta);
 			scene->systems.physics_system.update();

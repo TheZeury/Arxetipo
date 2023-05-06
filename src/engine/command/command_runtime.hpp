@@ -28,26 +28,30 @@ namespace arx
 
 		auto run() -> void {
 			while (!exit) {
-				try {
-					output.flush();
-					std::string line;
-					std::getline(input, line);
-					if (input.eof()) {
-						break;
-					}
-					lexer << line;
+				output.flush();
+				std::string line;
+				std::getline(input, line);
+				if (input.eof()) {
+					break;
 				}
-				catch (const CommandException& exception) {
-					error << exception.what() << std::endl;
-					while (parser.awaiting_nodes.size() > 1) {
-						parser.awaiting_nodes.pop();
-					}
-					while (parser.processing_nodes.size() > 1) {
-						parser.processing_nodes.pop();
-					}
-					while (kernel.scope_stack.size() > 1) {
-						kernel.scope_stack.pop_back();
-					}
+				run_code(line);
+			}
+		}
+
+		auto run_code(const std::string& code) -> void {
+			try {
+				lexer << code;
+			}
+			catch (const CommandException& exception) {
+				error << exception.what() << std::endl;
+				while (parser.awaiting_nodes.size() > 1) {
+					parser.awaiting_nodes.pop();
+				}
+				while (parser.processing_nodes.size() > 1) {
+					parser.processing_nodes.pop();
+				}
+				while (kernel.scope_stack.size() > 1) {
+					kernel.scope_stack.pop_back();
 				}
 			}
 		}
