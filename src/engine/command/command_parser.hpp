@@ -294,7 +294,10 @@ namespace arx
 		auto parse_comma(const CommandToken& token) -> void {
 			auto submitted = submit_preceding_operations(",");
 
-			if (awaiting_nodes.top().type != CommandASTNode::Type::Expression) {
+			if (awaiting_nodes.top().type == CommandASTNode::Type::None) {
+				awaiting_nodes.push(CommandASTNode::make_empty());
+			}
+			else if (awaiting_nodes.top().type != CommandASTNode::Type::Expression) {
 				throw CommandException("Unexpected comma`,`. Comma`,` can only be used to terminate expression.");
 			}
 
@@ -334,7 +337,9 @@ namespace arx
 						processing_nodes.pop();
 					}
 					else if (awaiting_nodes.top().type == CommandASTNode::Type::None) { // None is not a legal node in AST, but a barrier for parser.
-						throw CommandException("Assignment terminated but no expression found. \nHint: If you want to assign an empty value to a non-existing indetifier, simply use `name;`");
+						assignment.expression = CommandASTExpressionNode::make_empty();
+						awaiting_nodes.pop(); // Remove barrier.
+						processing_nodes.pop();
 					}
 					else {
 						throw CommandException("Assigning a non-expression node is not allowed.");
@@ -398,7 +403,9 @@ namespace arx
 						processing_nodes.pop();
 					}
 					else if (awaiting_nodes.top().type == CommandASTNode::Type::None) { // None is not a legal node in AST, but a barrier for parser.
-						throw CommandException("Assignment terminated but no expression found. \nHint: If you want to assign an empty value to a non-existing indetifier, simply use `name;`");
+						returning.expression = CommandASTExpressionNode::make_empty();
+						awaiting_nodes.pop(); // Remove barrier.
+						processing_nodes.pop();
 					}
 					else {
 						throw CommandException("Assigning a non-expression node is not allowed.");
@@ -480,7 +487,7 @@ namespace arx
 					throw CommandException("Return is a statement and must be standalone.");
 				}
 
-				processing_nodes.push(CommandASTNode::make_return(token.value.length(), CommandASTExpressionNode::make_none()));
+				processing_nodes.push(CommandASTNode::make_return(token.value.length(), CommandASTExpressionNode::make_empty()));
 				awaiting_nodes.push(CommandASTNode::make_none());
 			}
 			else if (token.value[0] == '>') {

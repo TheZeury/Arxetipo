@@ -209,7 +209,7 @@ namespace arx
 				CommandASTMethodBodyNode
 			>&& value) : type(type), value(std::move(value)) { }
 
-		static auto make_none() -> CommandASTExpressionNode {
+		static auto make_empty() -> CommandASTExpressionNode {
 			return CommandASTExpressionNode { CommandASTExpressionNode::Type::Empty,
 				CommandASTNoneNode{ }
 			};
@@ -448,6 +448,11 @@ namespace arx
 
 		static auto make_none() -> CommandASTNode {
 			return CommandASTNode{ Type::None, CommandASTNoneNode{ } };
+		}
+		static auto make_empty() -> CommandASTNode {
+			return CommandASTNode{ CommandASTNode::Type::Expression,
+				CommandASTExpressionNode { CommandASTExpressionNode::Type::Empty, { } }
+			};
 		}
 		static auto make_number(float value) -> CommandASTNode {
 			return CommandASTNode{ CommandASTNode::Type::Expression,
