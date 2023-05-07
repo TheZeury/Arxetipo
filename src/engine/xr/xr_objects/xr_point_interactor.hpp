@@ -181,6 +181,23 @@ namespace arx
 				}
 			}
 
+			for (auto& [candidate, type] : candidates_change) {
+				auto& [interactable, contact_transform] = candidate;
+				if (type) { // add	
+					if (candidates.find(candidate) == candidates.end()) {
+						candidates.insert(candidate);
+						interactable->pass_event(EventType::Enter, action_state, contact_transform);
+					}
+				}
+				else { // remove
+					if (candidates.find(candidate) != candidates.end()) {
+						candidates.erase(candidate);
+						interactable->pass_event(EventType::Exit, action_state, contact_transform);
+					}
+				}
+			}
+			candidates_change.clear();
+
 			for (auto& [candidate, contact_transform] : candidates) {
 				candidate->pass_event(EventType::Hovering, action_state, contact_transform);
 			}
@@ -211,13 +228,19 @@ namespace arx
 		}
 
 		auto add_candidate(Interactable* interactable, SpaceTransform* contact_transform) -> void {
+			candidates_change.push_back({ { interactable, contact_transform }, true });
+		}
+		auto remove_candidate(Interactable* interactable, SpaceTransform* contact_transform) -> void {
+			candidates_change.push_back({ { interactable, contact_transform }, false });
+		}
+
+		auto add_candidate_immediate(Interactable* interactable, SpaceTransform* contact_transform) -> void {
 			if (candidates.find({ interactable, contact_transform }) == candidates.end()) {
 				candidates.insert({ interactable, contact_transform });
 				interactable->pass_event(EventType::Enter, action_state, contact_transform);
 			}
 		}
-
-		auto remove_candidate(Interactable* interactable, SpaceTransform* contact_transform) -> void {
+		auto remove_candidate_immediate(Interactable* interactable, SpaceTransform* contact_transform) -> void {
 			if (candidates.find({ interactable, contact_transform }) != candidates.end()) {
 				candidates.erase({ interactable, contact_transform });
 				interactable->pass_event(EventType::Exit, action_state, contact_transform);
@@ -237,6 +260,7 @@ namespace arx
 
 	public:
 		std::set<std::tuple<Interactable*, SpaceTransform*>> candidates;
+		std::vector<std::pair<std::tuple<Interactable*, SpaceTransform*>, bool>> candidates_change; // true for add, false for remove
 		std::tuple<Interactable*, SpaceTransform*> selected = { nullptr, nullptr };
 		ActionState action_state;
 		XRController* controller;

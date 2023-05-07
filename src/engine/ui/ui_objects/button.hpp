@@ -41,6 +41,7 @@ namespace arx
 		auto pass_event(XRPointInteractor::EventType event_type, const XRPointInteractor::ActionState& actions, SpaceTransform* contact_transform) -> void override {
 			switch (event_type) {
 			case XRPointInteractor::EventType::Enter: {
+				activated_before_entered = activating;
 				if (settings.pushable) {
 					enter_z = (glm::inverse(initial_transform.get_global_matrix()) * glm::vec4(contact_transform->get_global_position(), 1.f)).z;
 				}
@@ -61,9 +62,8 @@ namespace arx
 				break;
 			}
 			case XRPointInteractor::EventType::Select: {
-				if (!activating) {
+				if (!activated_before_entered) {
 					button_transform->set_local_position(initial_transform.get_local_matrix() * glm::vec4(0.f, 0.f, -activating_depth, 1.f));
-					activating = true;
 					if (!settings.keep_activated) {
 						keep_activating = true;
 						// `settings.keep_activated` and `keep_activating` can't be both true.
@@ -72,18 +72,28 @@ namespace arx
 						// If they are both turned on, problems is that pushing will still be disabled after trigger is released.
 					}
 					top = -activating_depth;
-					if (on_press != nullptr) {
-						on_press();
+					if (!activating) {
+						activating = true;
+						if (on_press != nullptr) {
+							on_press();
+						}
 					}
+					activated_before_entered = true;
+					enter_z = (glm::inverse(initial_transform.get_global_matrix()) * glm::vec4(contact_transform->get_global_position(), 1.f)).z;
 				}
 				else {
 					if (settings.keep_activated) {
 						button_transform->set_local_position(initial_transform.get_local_position());
-						activating = false;
 						top = 0.f;
-						if (on_release != nullptr) {
-							on_release();
+						if (activating) {
+							activating = false;
+							if (on_release != nullptr) {
+								on_release();
+							}
 						}
+						switched = false;
+						activated_before_entered = false;
+						enter_z = (glm::inverse(initial_transform.get_global_matrix()) * glm::vec4(contact_transform->get_global_position(), 1.f)).z;
 					}
 				}
 				break;
@@ -97,6 +107,9 @@ namespace arx
 					if (on_release != nullptr) {
 						on_release();
 					}
+					switched = false;
+					activated_before_entered = false;
+					enter_z = (glm::inverse(initial_transform.get_global_matrix()) * glm::vec4(contact_transform->get_global_position(), 1.f)).z;
 				}
 				break;
 			}
@@ -157,6 +170,7 @@ namespace arx
 		bool switched = false;
 		bool keep_activating = false;
 		float top = 0.0f;
+		bool activated_before_entered = false;
 
 	public: // Settings.
 		SpaceTransform* button_transform;

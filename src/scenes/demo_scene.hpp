@@ -214,7 +214,7 @@ namespace arx
 					.typewriter = presets::Typewriter(renderer, physics_engine, presets::Typewriter::Settings{
 						.listener = &entities.typewriter.listener,
 						.transform = &entities.typewriter.transform,
-						.layout = presets::Typewriter::Layout::Dvorak,
+						.layout = presets::Typewriter::Layout::Qwerty,
 						.key_half_extent = { 0.015f, 0.015f, 0.005f },
 						.key_space = { 0.035f, 0.035f },
 						.font = resources.font,
