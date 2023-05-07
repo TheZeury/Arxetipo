@@ -125,7 +125,7 @@ namespace arx
 						.association = ActorTransformAssociation{ &entities.panel.button_a.rigid_dynamic, &entities.panel.button_a.transform },
 						.button = Button({
 							.actor_component = &entities.panel.button_a.rigid_dynamic,
-							.keep_activated = false,
+							.is_switch = false,
 							.pushable = true,
 							.bottom_depth = 0.01f,
 						}),
@@ -151,7 +151,7 @@ namespace arx
 						.association = ActorTransformAssociation{ &entities.panel.button_b.rigid_dynamic, &entities.panel.button_b.transform },
 						.button = Button({
 							.actor_component = &entities.panel.button_b.rigid_dynamic,
-							.keep_activated = true,
+							.is_switch = true,
 							.pushable = true,
 							.bottom_depth = 0.01f,
 						}),
@@ -166,7 +166,7 @@ namespace arx
 							physics_engine,
 							presets::BlankBoxButton::Settings{
 								.transform = &entities.panel.button_c.transform,
-								.half_extent = { 0.02f, 0.01f, 0.005f },
+								.half_extent = { 0.02f, 0.01f, 0.01f },
 								.debug_visualized = true,
 							}
 						}

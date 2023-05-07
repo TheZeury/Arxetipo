@@ -250,7 +250,7 @@ namespace arx::presets
 						.half_extent = settings.key_half_extent,
 						.text = to_label(key),
 						.font = settings.font,
-						.keep_activated = key == 'C',
+						.is_switch = key == 'C',
 						.pushable = true,
 						.debug_visualized = settings.debug_visualized,
 						.on_press = [this, key, listener = settings.listener]() {
@@ -282,7 +282,7 @@ namespace arx::presets
 					.half_extent = glm::vec3{ board_extent.x * 0.5f - settings.key_space.x * 0.5f + settings.key_half_extent.x , settings.key_half_extent.y, settings.key_half_extent.z },
 					.text = to_label(key),
 					.font = settings.font,
-					.keep_activated = false,
+					.is_switch = false,
 					.pushable = true,
 					.debug_visualized = settings.debug_visualized,
 					.on_press = [this, key, listener = settings.listener]() {

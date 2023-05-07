@@ -7,11 +7,11 @@ namespace arx
 	public:
 		struct Settings {
 			RigidDynamicComponent* actor_component;
-			bool keep_activated = true;
+			bool is_switch = true;
 			bool pushable = false;
 			float bottom_depth;
 			float activating_factor = 0.6f;
-			float switch_factor = 0.8f;
+			float invoke_factor = 0.8f;
 		};
 
 	public:
@@ -41,75 +41,40 @@ namespace arx
 		auto pass_event(XRPointInteractor::EventType event_type, const XRPointInteractor::ActionState& actions, SpaceTransform* contact_transform) -> void override {
 			switch (event_type) {
 			case XRPointInteractor::EventType::Enter: {
-				activated_before_entered = activating;
-				if (settings.pushable) {
-					enter_z = (glm::inverse(initial_transform.get_global_matrix()) * glm::vec4(contact_transform->get_global_position(), 1.f)).z;
-				}
+				activating_before_select = activating;
+				enter_z = (glm::inverse(initial_transform.get_global_matrix()) * glm::vec4(contact_transform->get_global_position(), 1.f)).z + (activating ? activating_depth : 0.f);
+				invoked = false;
 				break;
 			}
 			case XRPointInteractor::EventType::Exit: {
-				if (settings.pushable) {
-					switched = false;
-					if (activating && !settings.keep_activated && !keep_activating) {
-						activating = false;
-						top = 0.f;
-						if (on_release != nullptr) {
-							on_release();
-						}
+				if (settings.pushable && !keep_activating) {
+					if (settings.is_switch && activating) {
+						goto_active(contact_transform);
 					}
-					button_transform->set_local_position(initial_transform.get_local_matrix() * glm::vec4(0.f, 0.f, top, 1.f));
+					else {
+						goto_inactive(contact_transform);
+					}
 				}
 				break;
 			}
 			case XRPointInteractor::EventType::Select: {
-				if (!activated_before_entered) {
-					button_transform->set_local_position(initial_transform.get_local_matrix() * glm::vec4(0.f, 0.f, -activating_depth, 1.f));
-					if (!settings.keep_activated) {
-						keep_activating = true;
-						// `settings.keep_activated` and `keep_activating` can't be both true.
-						// `keep_activating` is turned on when `settings.keep_activated` is false and trigger is being hold.
-						// `keep_activating` will disable pushing temporarily.
-						// If they are both turned on, problems is that pushing will still be disabled after trigger is released.
-					}
-					top = -activating_depth;
-					if (!activating) {
-						activating = true;
-						if (on_press != nullptr) {
-							on_press();
-						}
-					}
-					activated_before_entered = true;
-					enter_z = (glm::inverse(initial_transform.get_global_matrix()) * glm::vec4(contact_transform->get_global_position(), 1.f)).z;
+				keep_activating = true;
+				if (!activating_before_select) {
+					goto_active(contact_transform);
 				}
 				else {
-					if (settings.keep_activated) {
-						button_transform->set_local_position(initial_transform.get_local_position());
-						top = 0.f;
-						if (activating) {
-							activating = false;
-							if (on_release != nullptr) {
-								on_release();
-							}
-						}
-						switched = false;
-						activated_before_entered = false;
-						enter_z = (glm::inverse(initial_transform.get_global_matrix()) * glm::vec4(contact_transform->get_global_position(), 1.f)).z;
+					if (settings.is_switch) {
+						goto_inactive(contact_transform);
+						invoked = false;
 					}
 				}
 				break;
 			}
 			case XRPointInteractor::EventType::Deselect: {
-				if (!settings.keep_activated) {
-					button_transform->set_local_position(initial_transform.get_local_position());
-					activating = false;
-					keep_activating = false;
-					top = 0.f;
-					if (on_release != nullptr) {
-						on_release();
-					}
-					switched = false;
-					activated_before_entered = false;
-					enter_z = (glm::inverse(initial_transform.get_global_matrix()) * glm::vec4(contact_transform->get_global_position(), 1.f)).z;
+				keep_activating = false;
+				invoked = false;
+				if (!settings.is_switch) {
+					goto_inactive(contact_transform);
 				}
 				break;
 			}
@@ -119,8 +84,8 @@ namespace arx
 					auto z = glm::clamp(current_z - enter_z, -settings.bottom_depth, top);
 					glm::vec4 translate{ 0.f, 0.f, z, 1.f };
 					button_transform->set_local_position(initial_transform.get_local_matrix() * translate);
-					if (!switched && z < -switch_depth) {
-						switched = true;
+					if (!invoked && z < -invoke_depth) {
+						invoked = true;
 						if (activating) {
 							activating = false;
 							top = 0.f;
@@ -130,7 +95,7 @@ namespace arx
 						}
 						else {
 							activating = true;
-							top = -activating_depth;
+							top = settings.is_switch ? -activating_depth : 0.f;
 							if (on_press != nullptr) {
 								on_press();
 							}
@@ -148,6 +113,33 @@ namespace arx
 			}
 		}
 
+	private:
+		auto goto_active(SpaceTransform* contact_transform) -> void {
+			button_transform->set_local_position(initial_transform.get_local_matrix() * glm::vec4(0.f, 0.f, -activating_depth, 1.f));
+			top = -activating_depth;
+			if (!activating) {
+				activating = true;
+				if (on_press != nullptr) {
+					on_press();
+				}
+			}
+			activating_before_select = true;
+			enter_z = (glm::inverse(initial_transform.get_global_matrix()) * glm::vec4(contact_transform->get_global_position(), 1.f)).z + activating_depth;
+		}
+
+		auto goto_inactive(SpaceTransform* contact_transform) -> void {
+			button_transform->set_local_position(initial_transform.get_local_position());
+			top = 0.f;
+			if (activating) {
+				activating = false;
+				if (on_release != nullptr) {
+					on_release();
+				}
+			}
+			activating_before_select = false;
+			enter_z = (glm::inverse(initial_transform.get_global_matrix()) * glm::vec4(contact_transform->get_global_position(), 1.f)).z;
+		}
+
 	public: // Callbacks.
 		std::function<void()> on_press;
 		std::function<void()> on_release;
@@ -158,7 +150,7 @@ namespace arx
 			button_actor{ settings.actor_component->get_rigid_actor() },
 			initial_transform{ button_transform->get_local_matrix(), button_transform->get_parent() },
 			activating_depth{ settings.bottom_depth * settings.activating_factor },
-			switch_depth{ settings.bottom_depth * settings.switch_factor },
+			invoke_depth{ settings.bottom_depth * settings.invoke_factor },
 			settings{ std::move(settings) }
 		{
 			button_actor->setActorFlag(physx::PxActorFlag::eDISABLE_GRAVITY, true);
@@ -167,10 +159,10 @@ namespace arx
 	private: // State.
 		float enter_z = 0.0f;
 		bool activating = false;
-		bool switched = false;
+		bool invoked = false;
 		bool keep_activating = false;
 		float top = 0.0f;
-		bool activated_before_entered = false;
+		bool activating_before_select = false;
 
 	public: // Settings.
 		SpaceTransform* button_transform;
@@ -178,7 +170,7 @@ namespace arx
 		Settings settings;
 		SpaceTransform initial_transform;
 		float activating_depth;
-		float switch_depth;
+		float invoke_depth;
 		XRSystem* xr_system = nullptr;
 	};
 
@@ -190,10 +182,10 @@ namespace arx
 				glm::vec3 half_extent;
 				std::string text = { };
 				Bitmap* font = nullptr;
-				bool keep_activated = true;
+				bool is_switch = true;
 				bool pushable = true;
 				float activating_factor = 0.6f;
-				float switch_factor = 0.8f;
+				float invoke_factor = 0.8f;
 				bool debug_visualized = false;
 				std::function<void()> on_press = nullptr;
 				std::function<void()> on_release = nullptr;
@@ -236,11 +228,11 @@ namespace arx
 				association{ &rigid_dynamic, transform },
 				button{ {
 					.actor_component = &rigid_dynamic,
-					.keep_activated = settings.keep_activated,
+					.is_switch = settings.is_switch,
 					.pushable = settings.pushable,
 					.bottom_depth = settings.half_extent.z * 2.f,
 					.activating_factor = settings.activating_factor,
-					.switch_factor = settings.switch_factor,
+					.invoke_factor = settings.invoke_factor,
 				} },
 				text{
 					.transform = SpaceTransform{ glm::vec3(0.f, 0.f, settings.half_extent.z * 2.f + 0.001f), transform },
