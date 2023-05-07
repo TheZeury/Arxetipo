@@ -53,7 +53,7 @@ namespace arx
 		struct PointInteractorTriggerCallback : public ITriggerCallback {
 			PointInteractorTriggerCallback(XRPointInteractor* interactor) : interactor(interactor) {}
 			XRPointInteractor* interactor;
-			auto OnEnter(const TriggerPair& pair) -> void override {
+			auto on_enter(const TriggerPair& pair) -> void override {
 				auto actor = pair.otherActor;
 				auto iter = interactor->xr_system->point_interactables.find(actor);
 				if (iter == interactor->xr_system->point_interactables.end()) {
@@ -63,7 +63,7 @@ namespace arx
 				Interactable* interactable = static_cast<Interactable*>(iter->second);
 				interactor->add_candidate(interactable, get_transform_from_shape(pair.triggerActor, pair.triggerShape));
 			}
-			auto OnExit(const TriggerPair& pair) -> void override {
+			auto on_exit(const TriggerPair& pair) -> void override {
 				auto actor = pair.otherActor;
 				auto iter = interactor->xr_system->point_interactables.find(actor);
 				if (iter == interactor->xr_system->point_interactables.end()) {
@@ -92,15 +92,15 @@ namespace arx
 
 			// Raw actions.
 			{
-				action_state.active = bool(input_state.handActive[controller_id]);
-				action_state.position = cnv<glm::vec3>(input_state.handLocations[controller_id].pose.position);
-				action_state.rotation = cnv<glm::quat>(input_state.handLocations[controller_id].pose.orientation);
-				action_state.trigger_value = input_state.triggerStates[controller_id].currentState;
-				action_state.grip_value = input_state.gripStates[controller_id].currentState;
-				action_state.primary_button = bool(input_state.primaryButtonStates[controller_id].currentState);
-				action_state.secondary_button = bool(input_state.secondaryButtonStates[controller_id].currentState);
-				action_state.thumbstick.x = input_state.thumbstickXStates[controller_id].currentState;
-				action_state.thumbstick.y = input_state.thumbstickYStates[controller_id].currentState;
+				action_state.active = bool(input_state.hand_active[controller_id]);
+				action_state.position = cnv<glm::vec3>(input_state.hand_locations[controller_id].pose.position);
+				action_state.rotation = cnv<glm::quat>(input_state.hand_locations[controller_id].pose.orientation);
+				action_state.trigger_value = input_state.trigger_states[controller_id].currentState;
+				action_state.grip_value = input_state.grip_states[controller_id].currentState;
+				action_state.primary_button = bool(input_state.primary_button_states[controller_id].currentState);
+				action_state.secondary_button = bool(input_state.secondary_button_states[controller_id].currentState);
+				action_state.thumbstick.x = input_state.thumbstick_x_states[controller_id].currentState;
+				action_state.thumbstick.y = input_state.thumbstick_y_states[controller_id].currentState;
 			}
 
 			// Processed actions.

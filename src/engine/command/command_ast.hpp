@@ -561,7 +561,7 @@ namespace arx
 		return std::make_unique<T>(v->clone());
 	}
 
-	auto to_string(CommandASTOperationNode::Type operation) -> std::string {
+	inline auto to_string(CommandASTOperationNode::Type operation) -> std::string {
 		switch (operation) {
 		case CommandASTOperationNode::Type::Add: {
 			return "+";
@@ -596,7 +596,7 @@ namespace arx
 		}
 	}
 
-	auto to_operation_type(const std::string& operation) -> CommandASTOperationNode::Type {
+	inline auto to_operation_type(const std::string& operation) -> CommandASTOperationNode::Type {
 		if (operation == "+") {
 			return CommandASTOperationNode::Type::Add;
 		}

@@ -23,8 +23,8 @@ namespace arx
 		const char sign[16] = "TCB";
 		auto verify() -> bool const { return sign[0] == 'T' && sign[1] == 'C' && sign[2] == 'B'; }
 
-		virtual auto OnEnter(const TriggerPair& pair) -> void = 0;
-		virtual auto OnExit(const TriggerPair& pair) -> void = 0;
+		virtual auto on_enter(const TriggerPair& pair) -> void = 0;
+		virtual auto on_exit(const TriggerPair& pair) -> void = 0;
 	};
 
 	class EventCallback : public physx::PxSimulationEventCallback
@@ -44,11 +44,11 @@ namespace arx
 					ITriggerCallback* triggerCallback = reinterpret_cast<ITriggerCallback*>(pair.triggerShape->userData);
 					if (pair.status & physx::PxPairFlag::eNOTIFY_TOUCH_FOUND)
 					{
-						triggerCallback->OnEnter(pair);
+						triggerCallback->on_enter(pair);
 					}
 					else if (pair.status & physx::PxPairFlag::eNOTIFY_TOUCH_LOST)
 					{
-						triggerCallback->OnExit(pair);
+						triggerCallback->on_exit(pair);
 					}
 					else
 					{
@@ -60,37 +60,38 @@ namespace arx
 		virtual void onAdvance(const RigidBody* const* bodyBuffer, const PhysicsTransform* poseBuffer, const physx::PxU32 count) { }
 	};
 
-	physx::PxFilterFlags SimulationFilterShader(
-		physx::PxFilterObjectAttributes attributes0, physx::PxFilterData filterData0,
-		physx::PxFilterObjectAttributes attributes1, physx::PxFilterData filterData1,
-		physx::PxPairFlags& pairFlags, const void* constantBlock, physx::PxU32 constantBlockSize)
+	struct PhysXEngine
 	{
-		// Filter test.
-		// word0: mask.
-		// word1: bits to filter out if counter's mask contains any.
-		// word2: bits that counter's mask must contains all.
-		// word3: friend mask, ignore word0, word1 and word2 as long as two friend masks overlap.
-		if (!(filterData0.word3 & filterData0.word3) && (
-			(filterData0.word1 & filterData1.word0) || (filterData1.word1 & filterData0.word0) ||
-			(filterData0.word2 & filterData1.word0 ^ filterData0.word2) || (filterData1.word2 & filterData0.word0 ^ filterData1.word2))) {
-			return physx::PxFilterFlag::eKILL;
-		}
+	public:
+		static auto simulation_filter_shader(
+			physx::PxFilterObjectAttributes attributes0, physx::PxFilterData filterData0,
+			physx::PxFilterObjectAttributes attributes1, physx::PxFilterData filterData1,
+			physx::PxPairFlags& pairFlags, const void* constantBlock, physx::PxU32 constantBlockSize) -> physx::PxFilterFlags
+		{
+			// Filter test.
+			// word0: mask.
+			// word1: bits to filter out if counter's mask contains any.
+			// word2: bits that counter's mask must contains all.
+			// word3: friend mask, ignore word0, word1 and word2 as long as two friend masks overlap.
+			if (!(filterData0.word3 & filterData0.word3) && (
+				(filterData0.word1 & filterData1.word0) || (filterData1.word1 & filterData0.word0) ||
+				(filterData0.word2 & filterData1.word0 ^ filterData0.word2) || (filterData1.word2 & filterData0.word0 ^ filterData1.word2))) {
+				return physx::PxFilterFlag::eKILL;
+			}
 
-		if (physx::PxFilterObjectIsTrigger(attributes0) || physx::PxFilterObjectIsTrigger(attributes1)) {
-			pairFlags = physx::PxPairFlag::eTRIGGER_DEFAULT;
+			if (physx::PxFilterObjectIsTrigger(attributes0) || physx::PxFilterObjectIsTrigger(attributes1)) {
+				pairFlags = physx::PxPairFlag::eTRIGGER_DEFAULT;
+				return physx::PxFilterFlag::eDEFAULT;
+			}
+
+			pairFlags = physx::PxPairFlag::eCONTACT_DEFAULT;
 			return physx::PxFilterFlag::eDEFAULT;
 		}
 
-		pairFlags = physx::PxPairFlag::eCONTACT_DEFAULT;
-		return physx::PxFilterFlag::eDEFAULT;
-	}
-
-	struct PhysXEngine
-	{
 	public: // concept: PhysicsEngine
 		auto initialize() -> void {
 			log_step("PhysX", "Initializing PhysX");
-			foundation = PxCreateFoundation(PX_PHYSICS_VERSION, allocator, errorCallback);
+			foundation = PxCreateFoundation(PX_PHYSICS_VERSION, allocator, error_callback);
 			physics = PxCreatePhysics(PX_PHYSICS_VERSION, *foundation, physx::PxTolerancesScale(), true);
 			dispatcher = physx::PxDefaultCpuDispatcherCreate(physx::PxThread::getNbPhysicalCores());
 			log_success();
@@ -148,14 +149,14 @@ namespace arx
 			return rigid;
 		}
 		auto create_physics_scene() -> physx::PxScene* {
-			physx::PxSceneDesc sceneDesc(physics->getTolerancesScale());
+			physx::PxSceneDesc scene_desc(physics->getTolerancesScale());
 			{
-				sceneDesc.gravity = PhysicsVec3(0.0f, -9.81f, 0.0f);
-				sceneDesc.cpuDispatcher = dispatcher;
-				sceneDesc.simulationEventCallback = new EventCallback();
-				sceneDesc.filterShader = SimulationFilterShader;// PxDefaultSimulationFilterShader;
+				scene_desc.gravity = PhysicsVec3(0.0f, -9.81f, 0.0f);
+				scene_desc.cpuDispatcher = dispatcher;
+				scene_desc.simulationEventCallback = new EventCallback();
+				scene_desc.filterShader = simulation_filter_shader;// PxDefaultsimulation_filter_shader;
 			}
-			return physics->createScene(sceneDesc);
+			return physics->createScene(scene_desc);
 		}
 
 	public:
@@ -165,7 +166,7 @@ namespace arx
 
 	public:
 		physx::PxDefaultAllocator allocator;
-		physx::PxDefaultErrorCallback errorCallback;
+		physx::PxDefaultErrorCallback error_callback;
 		physx::PxFoundation* foundation = nullptr;
 		physx::PxPhysics* physics = nullptr;
 		physx::PxDefaultCpuDispatcher* dispatcher = nullptr;

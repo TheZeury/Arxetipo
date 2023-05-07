@@ -21,29 +21,29 @@ namespace arx
 {
 	struct InputAction
 	{
-		xr::ActionSet actionSet;
-		xr::Action poseAction;
-		xr::Action triggerAction;
-		xr::Action gripAction;
-		xr::Action primaryButtonAction;
-		xr::Action secondaryButtonAction;
-		xr::Action thumbstickXAction;
-		xr::Action thumbstickYAction;
-		xr::Action vibrateAction;
-		std::array<xr::Path, 2> handSubactionPath;
-		std::array<xr::Space, 2> handSpace;
+		xr::ActionSet action_set;
+		xr::Action pose_action;
+		xr::Action trigger_action;
+		xr::Action grip_action;
+		xr::Action primary_button_action;
+		xr::Action secondary_button_action;
+		xr::Action thumbstick_x_action;
+		xr::Action thumbstick_y_action;
+		xr::Action vibrate_action;
+		std::array<xr::Path, 2> hand_subaction_path;
+		std::array<xr::Space, 2> hand_space;
 	};
 
 	struct InputState
 	{
-		std::array<xr::Bool32, 2> handActive;
-		std::array<xr::SpaceLocation, 2> handLocations;
-		std::array<xr::ActionStateFloat, 2> triggerStates;
-		std::array<xr::ActionStateFloat, 2> gripStates;
-		std::array<xr::ActionStateBoolean, 2> primaryButtonStates;
-		std::array<xr::ActionStateBoolean, 2> secondaryButtonStates;
-		std::array<xr::ActionStateFloat, 2> thumbstickXStates;
-		std::array<xr::ActionStateFloat, 2> thumbstickYStates;
+		std::array<xr::Bool32, 2> hand_active;
+		std::array<xr::SpaceLocation, 2> hand_locations;
+		std::array<xr::ActionStateFloat, 2> trigger_states;
+		std::array<xr::ActionStateFloat, 2> grip_states;
+		std::array<xr::ActionStateBoolean, 2> primary_button_states;
+		std::array<xr::ActionStateBoolean, 2> secondary_button_states;
+		std::array<xr::ActionStateFloat, 2> thumbstick_x_states;
+		std::array<xr::ActionStateFloat, 2> thumbstick_y_states;
 	};
 
 	// MAKE_HANDLE(OpenXrInstance);
@@ -100,8 +100,8 @@ namespace arx
 					}
 					case xr::StructureType::EventDataSessionStateChanged:
 					{
-						xr::EventDataSessionStateChanged eventDataSessionStateChanged(*reinterpret_cast<xr::EventDataSessionStateChanged*>(&event_data_buffer));
-						go_on = handle_session_state_changed_event(eventDataSessionStateChanged);
+						xr::EventDataSessionStateChanged event_data_session_state_changed(*reinterpret_cast<xr::EventDataSessionStateChanged*>(&event_data_buffer));
+						go_on = handle_session_state_changed_event(event_data_session_state_changed);
 						break;
 					}
 					default:
@@ -123,65 +123,65 @@ namespace arx
 			return session_running;
 		}
 		auto poll_actions() -> void {
-			input_state.handActive = { XR_FALSE, XR_FALSE };
+			input_state.hand_active = { XR_FALSE, XR_FALSE };
 
-			xr::ActiveActionSet activeActionSet(input_action.actionSet, { });
-			xr::ActionsSyncInfo syncInfo(1, &activeActionSet);
-			session.syncActions(syncInfo);
+			xr::ActiveActionSet active_action_set(input_action.action_set, { });
+			xr::ActionsSyncInfo sync_info(1, &active_action_set);
+			session.syncActions(sync_info);
 
 			for (int hand : { 0, 1 })
 			{
-				xr::ActionStateGetInfo getInfo(input_action.poseAction, input_action.handSubactionPath[hand]);
+				xr::ActionStateGetInfo get_info(input_action.pose_action, input_action.hand_subaction_path[hand]);
 
-				xr::ActionStatePose poseState = session.getActionStatePose(getInfo);
-				input_state.handActive[hand] = poseState.isActive;
+				xr::ActionStatePose pose_state = session.getActionStatePose(get_info);
+				input_state.hand_active[hand] = pose_state.isActive;
 
-				getInfo.action = input_action.triggerAction;
-				xr::ActionStateFloat triggerState = session.getActionStateFloat(getInfo);
-				input_state.triggerStates[hand] = triggerState;
+				get_info.action = input_action.trigger_action;
+				xr::ActionStateFloat trigger_state = session.getActionStateFloat(get_info);
+				input_state.trigger_states[hand] = trigger_state;
 
-				getInfo.action = input_action.gripAction;
-				xr::ActionStateFloat gripState = session.getActionStateFloat(getInfo);
-				input_state.gripStates[hand] = gripState;
+				get_info.action = input_action.grip_action;
+				xr::ActionStateFloat grip_state = session.getActionStateFloat(get_info);
+				input_state.grip_states[hand] = grip_state;
 
-				getInfo.action = input_action.primaryButtonAction;
-				xr::ActionStateBoolean primaryButtonState = session.getActionStateBoolean(getInfo);
-				input_state.primaryButtonStates[hand] = primaryButtonState;
+				get_info.action = input_action.primary_button_action;
+				xr::ActionStateBoolean primary_button_state = session.getActionStateBoolean(get_info);
+				input_state.primary_button_states[hand] = primary_button_state;
 
-				getInfo.action = input_action.secondaryButtonAction;
-				xr::ActionStateBoolean secondaryButtonState = session.getActionStateBoolean(getInfo);
-				input_state.secondaryButtonStates[hand] = secondaryButtonState;
+				get_info.action = input_action.secondary_button_action;
+				xr::ActionStateBoolean secondary_button_state = session.getActionStateBoolean(get_info);
+				input_state.secondary_button_states[hand] = secondary_button_state;
 
-				getInfo.action = input_action.thumbstickXAction;
-				xr::ActionStateFloat thumbstickXState = session.getActionStateFloat(getInfo);
-				input_state.thumbstickXStates[hand] = thumbstickXState;
+				get_info.action = input_action.thumbstick_x_action;
+				xr::ActionStateFloat thumbstick_x_state = session.getActionStateFloat(get_info);
+				input_state.thumbstick_x_states[hand] = thumbstick_x_state;
 
-				getInfo.action = input_action.thumbstickYAction;
-				xr::ActionStateFloat thumbstickYState = session.getActionStateFloat(getInfo);
-				input_state.thumbstickYStates[hand] = thumbstickYState;
+				get_info.action = input_action.thumbstick_y_action;
+				xr::ActionStateFloat thumbstick_y_state = session.getActionStateFloat(get_info);
+				input_state.thumbstick_y_states[hand] = thumbstick_y_state;
 			}
 		}
 		auto update(const glm::mat4& camera_offset = glm::mat4{ 1.f }) -> void {
-			auto frameState = session.waitFrame({ });
+			auto frame_state = session.waitFrame({ });
 			session.beginFrame({ });
 
 			std::vector<xr::CompositionLayerBaseHeader*> layers = { };
 			xr::CompositionLayerProjection layer{ };
-			std::vector<xr::CompositionLayerProjectionView> projectionLayerViews;
+			std::vector<xr::CompositionLayerProjectionView> projection_layer_views;
 
-			if (frameState.shouldRender == XR_TRUE)
+			if (frame_state.shouldRender == XR_TRUE)
 			{
 				for (int hand : { 0, 1 })
 				{
-					input_state.handLocations[hand] = input_action.handSpace[hand].locateSpace(app_space, frameState.predictedDisplayTime);
+					input_state.hand_locations[hand] = input_action.hand_space[hand].locateSpace(app_space, frame_state.predictedDisplayTime);
 				}
 
-				xr::ViewState viewState{ };
-				xr::ViewLocateInfo locateInfo(xr::ViewConfigurationType::PrimaryStereo, frameState.predictedDisplayTime, app_space);
-				auto views = session.locateViewsToVector(locateInfo, reinterpret_cast<XrViewState*>(&viewState));
-				if ((viewState.viewStateFlags & xr::ViewStateFlagBits::PositionValid) && (viewState.viewStateFlags & xr::ViewStateFlagBits::OrientationValid))
+				xr::ViewState view_state{ };
+				xr::ViewLocateInfo locate_info(xr::ViewConfigurationType::PrimaryStereo, frame_state.predictedDisplayTime, app_space);
+				auto views = session.locateViewsToVector(locate_info, reinterpret_cast<XrViewState*>(&view_state));
+				if ((view_state.viewStateFlags & xr::ViewStateFlagBits::PositionValid) && (view_state.viewStateFlags & xr::ViewStateFlagBits::OrientationValid))
 				{
-					projectionLayerViews.resize(views.size());
+					projection_layer_views.resize(views.size());
 					std::vector<std::tuple<glm::mat4, glm::mat4, uint32_t>> xr_camera(views.size());
 					for (uint32_t i = 0; i < views.size(); ++i)
 					{
@@ -190,15 +190,15 @@ namespace arx
 						image_index = swap_chains[i].acquireSwapchainImage({});
 						swap_chains[i].waitSwapchainImage({xr::Duration::infinite()});
 
-						projectionLayerViews[i] = xr::CompositionLayerProjectionView{ views[i].pose, views[i].fov, { swap_chains[i], swap_chain_rects[i], 0}};
+						projection_layer_views[i] = xr::CompositionLayerProjectionView{ views[i].pose, views[i].fov, { swap_chains[i], swap_chain_rects[i], 0}};
 
 						XrMatrix4x4f_CreateProjectionFov(&cnv<XrMatrix4x4f>(mat_projection), GRAPHICS_VULKAN, views[i].fov, DEFAULT_NEAR_Z, INFINITE_FAR_Z);
 						glm::mat4 eye_pose;
 						glm::vec3 identity{ 1.f, 1.f, 1.f };
 						XrMatrix4x4f_CreateTranslationRotationScale(
 							&cnv<XrMatrix4x4f>(eye_pose), 
-							&(projectionLayerViews[i].pose.get()->position), 
-							&(projectionLayerViews[i].pose.get()->orientation), 
+							&(projection_layer_views[i].pose.get()->position), 
+							&(projection_layer_views[i].pose.get()->orientation), 
 							&cnv<XrVector3f>(identity)
 						);
 						mat_camera_transform = camera_offset * eye_pose;
@@ -213,14 +213,14 @@ namespace arx
 
 					layer.space = app_space;
 					layer.layerFlags = { };
-					layer.viewCount = (uint32_t)projectionLayerViews.size();
-					layer.views = projectionLayerViews.data();
+					layer.viewCount = (uint32_t)projection_layer_views.size();
+					layer.views = projection_layer_views.data();
 					layers.push_back(&layer);
 				}
 			}
 
-			xr::FrameEndInfo endInfo(frameState.predictedDisplayTime, xr::EnvironmentBlendMode::Opaque, static_cast<uint32_t>(layers.size()), layers.data());
-			session.endFrame(endInfo);
+			xr::FrameEndInfo end_info(frame_state.predictedDisplayTime, xr::EnvironmentBlendMode::Opaque, static_cast<uint32_t>(layers.size()), layers.data());
+			session.endFrame(end_info);
 		}
 
 	public:
@@ -230,10 +230,10 @@ namespace arx
 		auto create_instance() -> void {
 			// Logging Extensions and Layers -----------------------------------------------------
 			log_step("OpenXR", "Enumerating Supported OpenXR Extensions");
-			auto allExtensions = xr::enumerateInstanceExtensionPropertiesToVector(nullptr);
+			auto all_extensions = xr::enumerateInstanceExtensionPropertiesToVector(nullptr);
 			log_success();
-			log_info("OpenXR", std::format("List of total {} OpenXR Extension(s):", allExtensions.size()), 0);
-			for (const auto& ext : allExtensions)
+			log_info("OpenXR", std::format("List of total {} OpenXR Extension(s):", all_extensions.size()), 0);
+			for (const auto& ext : all_extensions)
 			{
 				log_info("OpenXR", ext.extensionName, 1);
 			}
@@ -263,7 +263,7 @@ namespace arx
 			}
 
 			log_step("OpenXR", "Creating OpenXR Instance");
-			xr::ApplicationInfo appInfo(
+			xr::ApplicationInfo app_info(
 				"Arxetipo",
 				1,
 				"Arxetipo Engine",
@@ -272,27 +272,27 @@ namespace arx
 			);
 
 			xr::InstanceCreateFlags flags = { };
-			xr::InstanceCreateInfo instanceCreateInfo(
+			xr::InstanceCreateInfo instance_create_info(
 				{ },
-				appInfo,
+				app_info,
 				0,
 				nullptr,
 				static_cast<uint32_t>(extensions.size()),
 				extensions.data()
 			);
 
-			instance = xr::createInstance(instanceCreateInfo);
+			instance = xr::createInstance(instance_create_info);
 			log_success();
 
 			// Logging Instance Properties -------------------------------------------------------
-			auto instanceProperty = instance.getInstanceProperties();
+			auto instance_property = instance.getInstanceProperties();
 			log_info(
 				"OpenXR",
 				std::format("OpenXR Runtime = {}, RuntimeVersion = {}.{}.{}",
-					instanceProperty.runtimeName,
-					instanceProperty.runtimeVersion.major(),
-					instanceProperty.runtimeVersion.minor(),
-					instanceProperty.runtimeVersion.patch()
+					instance_property.runtimeName,
+					instance_property.runtimeVersion.major(),
+					instance_property.runtimeVersion.minor(),
+					instance_property.runtimeVersion.patch()
 				),
 				0
 			);
@@ -309,25 +309,25 @@ namespace arx
 				throw std::runtime_error("Can't initialize OpenXR system when there's already one.");
 			}
 
-			xr::SystemGetInfo systemGetInfo(
+			xr::SystemGetInfo system_get_info(
 				xr::FormFactor::HeadMountedDisplay
 			);
 
-			system_id = instance.getSystem(systemGetInfo);
+			system_id = instance.getSystem(system_get_info);
 
 			log_success();
 		}
 
-		auto create_session(P::GraphicsBindingType graphicsBinding) -> void {
+		auto create_session(P::GraphicsBindingType graphics_binding) -> void {
 			log_step("OpenXR", "Creating OpenXR Session");
-			xr::SessionCreateInfo createInfo({}, system_id, &graphicsBinding);
-			session = instance.createSession(createInfo);
+			xr::SessionCreateInfo create_info({}, system_id, &graphics_binding);
+			session = instance.createSession(create_info);
 			log_success();
 		}
 		auto create_space() -> void {
 			log_step("OpenXR", "Creating Reference Space");
-			xr::ReferenceSpaceCreateInfo refSpaceCreateInfo(xr::ReferenceSpaceType::Stage, { });
-			app_space = session.createReferenceSpace(refSpaceCreateInfo);
+			xr::ReferenceSpaceCreateInfo ref_space_create_info(xr::ReferenceSpaceType::Stage, { });
+			app_space = session.createReferenceSpace(ref_space_create_info);
 			log_success();
 		}
 		auto create_swap_chains(P& proxy) -> void {
@@ -336,38 +336,38 @@ namespace arx
 				throw std::runtime_error("No system ID.");
 			}
 
-			auto systemPorperties = instance.getSystemProperties(system_id);
+			auto system_porperties = instance.getSystemProperties(system_id);
 			log_info("OpenXR", "System Properties: ", 0);
-			log_info("OpenXR", std::format("System Name : {}, Vendor ID : {}", systemPorperties.systemName, systemPorperties.vendorId), 1);
-			log_info("OpenXR", std::format("Graphics Properties: MaxSwapChainImageWidth = {}, MaxSwapChainImageHeight = {}, MaxLayers = {}", systemPorperties.graphicsProperties.maxSwapchainImageWidth, systemPorperties.graphicsProperties.maxSwapchainImageHeight, systemPorperties.graphicsProperties.maxLayerCount), 1);
-			log_info("OpenXR", std::format("Tracking Properties: OrientationTracking = {}, PositionTracking = {}", systemPorperties.trackingProperties.orientationTracking == XR_TRUE, systemPorperties.trackingProperties.positionTracking == XR_TRUE), 1);
+			log_info("OpenXR", std::format("System Name : {}, Vendor ID : {}", system_porperties.systemName, system_porperties.vendorId), 1);
+			log_info("OpenXR", std::format("Graphics Properties: MaxSwapChainImageWidth = {}, MaxSwapChainImageHeight = {}, MaxLayers = {}", system_porperties.graphicsProperties.maxSwapchainImageWidth, system_porperties.graphicsProperties.maxSwapchainImageHeight, system_porperties.graphicsProperties.maxLayerCount), 1);
+			log_info("OpenXR", std::format("Tracking Properties: OrientationTracking = {}, PositionTracking = {}", system_porperties.trackingProperties.orientationTracking == XR_TRUE, system_porperties.trackingProperties.positionTracking == XR_TRUE), 1);
 
 			config_views = instance.enumerateViewConfigurationViewsToVector(system_id, xr::ViewConfigurationType::PrimaryStereo);
 			log_info("OpenXR", std::format("Number of Views: {}", config_views.size()), 0);
 
-			auto swapChainFormats = session.enumerateSwapchainFormatsToVector();
+			auto swap_chain_formats = session.enumerateSwapchainFormatsToVector();
 			swap_chain_format = vk::Format::eB8G8R8A8Srgb;
-			int64_t i64format;
+			int64_t i64_format;
 			bool find = false;
 			log_info("OpenXR", std::format("Searching for Image Format, Desired Format : {}, All available Formats: ", vk::to_string(swap_chain_format)), 0);
-			for (auto format : swapChainFormats)
+			for (auto format : swap_chain_formats)
 			{
-				vk::Format vkFormat = (vk::Format)format;
-				if (vkFormat == swap_chain_format)
+				vk::Format vk_format = (vk::Format)format;
+				if (vk_format == swap_chain_format)
 				{
 					find = true;
-					i64format = format;
-					log_info("OpenXR", std::format("{} <= Found.", vk::to_string(vkFormat)), 1);
+					i64_format = format;
+					log_info("OpenXR", std::format("{} <= Found.", vk::to_string(vk_format)), 1);
 				}
 				else
 				{
-					log_info("OpenXR", vk::to_string(vkFormat), 1);
+					log_info("OpenXR", vk::to_string(vk_format), 1);
 				}
 			}
 			if (!find)
 			{
-				swap_chain_format = (vk::Format)swapChainFormats[0];
-				i64format = swapChainFormats[0];
+				swap_chain_format = (vk::Format)swap_chain_formats[0];
+				i64_format = swap_chain_formats[0];
 				log_info("OpenXR", std::format("Cannot find desired format, falling back to first available format : {}", vk::to_string(swap_chain_format)), 0);
 			}
 
@@ -376,132 +376,132 @@ namespace arx
 			for (const auto& view : config_views)
 			{
 				log_step("OpenXR", "Creating XR Side SwapChain");
-				xr::SwapchainCreateInfo swapChainInfo({}, xr::SwapchainUsageFlagBits::Sampled | xr::SwapchainUsageFlagBits::ColorAttachment | xr::SwapchainUsageFlagBits::TransferSrc, i64format, view.recommendedSwapchainSampleCount, view.recommendedImageRectWidth, view.recommendedImageRectHeight, 1, 1, 1);
-				auto swapChain = session.createSwapchain(swapChainInfo);
-				swap_chains.push_back(swapChain);
+				xr::SwapchainCreateInfo swap_chain_info({}, xr::SwapchainUsageFlagBits::Sampled | xr::SwapchainUsageFlagBits::ColorAttachment | xr::SwapchainUsageFlagBits::TransferSrc, i64_format, view.recommendedSwapchainSampleCount, view.recommendedImageRectWidth, view.recommendedImageRectHeight, 1, 1, 1);
+				auto swap_chain = session.createSwapchain(swap_chain_info);
+				swap_chains.push_back(swap_chain);
 				swap_chain_rects.push_back({ { 0, 0 }, { static_cast<int32_t>(view.recommendedImageRectWidth), static_cast<int32_t>(view.recommendedImageRectHeight) } });
 				log_success();
-				//log_info("OpenXR", std::format("SwapChainImageType = {}", xr::to_string(swapChainImages[0][0].type)), 0);
+				//log_info("OpenXR", std::format("SwapChainImageType = {}", xr::to_string(swap_chainImages[0][0].type)), 0);
 				log_info("OpenXR", std::format("SwapChainImageExtent = ({}, {}, {})", view.recommendedSwapchainSampleCount, view.recommendedImageRectWidth, view.recommendedImageRectHeight), 0);
 			}
-			proxy.passin_xr_swapchains(swap_chains, swap_chain_rects, i64format);
+			proxy.passin_xr_swapchains(swap_chains, swap_chain_rects, i64_format);
 			//graphics.create_swap_chain(proxy);
 		}
 		auto create_actions() -> void {
-			xr::ActionSetCreateInfo setInfo("gameplay", "Gameplay", 0);
-			input_action.actionSet = instance.createActionSet(setInfo);
+			xr::ActionSetCreateInfo set_info("gameplay", "Gameplay", 0);
+			input_action.action_set = instance.createActionSet(set_info);
 
-			input_action.handSubactionPath[0] = instance.stringToPath("/user/hand/left");
-			input_action.handSubactionPath[1] = instance.stringToPath("/user/hand/right");
+			input_action.hand_subaction_path[0] = instance.stringToPath("/user/hand/left");
+			input_action.hand_subaction_path[1] = instance.stringToPath("/user/hand/right");
 
-			xr::ActionCreateInfo poseActionInfo("hand_pose", xr::ActionType::PoseInput, static_cast<uint32_t>(input_action.handSubactionPath.size()), input_action.handSubactionPath.data(), "Hand Pose");
-			input_action.poseAction = input_action.actionSet.createAction(poseActionInfo);
+			xr::ActionCreateInfo pose_action_info("hand_pose", xr::ActionType::PoseInput, static_cast<uint32_t>(input_action.hand_subaction_path.size()), input_action.hand_subaction_path.data(), "Hand Pose");
+			input_action.pose_action = input_action.action_set.createAction(pose_action_info);
 
-			std::array<xr::Path, 2> posePath = {
+			std::array<xr::Path, 2> pose_path = {
 				instance.stringToPath("/user/hand/left/input/grip/pose"),
 				instance.stringToPath("/user/hand/right/input/grip/pose"),
 			};
 
-			xr::ActionCreateInfo triggerActionInfo("trigger", xr::ActionType::FloatInput, static_cast<uint32_t>(input_action.handSubactionPath.size()), input_action.handSubactionPath.data(), "Trigger");
-			input_action.triggerAction = input_action.actionSet.createAction(triggerActionInfo);
+			xr::ActionCreateInfo trigger_action_info("trigger", xr::ActionType::FloatInput, static_cast<uint32_t>(input_action.hand_subaction_path.size()), input_action.hand_subaction_path.data(), "Trigger");
+			input_action.trigger_action = input_action.action_set.createAction(trigger_action_info);
 
-			std::array<xr::Path, 2> triggerPath = {
+			std::array<xr::Path, 2> trigger_path = {
 				instance.stringToPath("/user/hand/left/input/trigger/value"),
 				instance.stringToPath("/user/hand/right/input/trigger/value"),
 			};
 
-			xr::ActionCreateInfo gripActionInfo("grip", xr::ActionType::FloatInput, static_cast<uint32_t>(input_action.handSubactionPath.size()), input_action.handSubactionPath.data(), "Grip");
-			input_action.gripAction = input_action.actionSet.createAction(gripActionInfo);
+			xr::ActionCreateInfo grip_action_info("grip", xr::ActionType::FloatInput, static_cast<uint32_t>(input_action.hand_subaction_path.size()), input_action.hand_subaction_path.data(), "Grip");
+			input_action.grip_action = input_action.action_set.createAction(grip_action_info);
 
-			std::array<xr::Path, 2> gripPath = {
+			std::array<xr::Path, 2> grip_path = {
 				instance.stringToPath("/user/hand/left/input/squeeze/value"),
 				instance.stringToPath("/user/hand/right/input/squeeze/value"),
 			};
 
-			xr::ActionCreateInfo primaryButtonActionInfo("primary_button", xr::ActionType::BooleanInput, static_cast<uint32_t>(input_action.handSubactionPath.size()), input_action.handSubactionPath.data(), "Primary Button");
-			input_action.primaryButtonAction = input_action.actionSet.createAction(primaryButtonActionInfo);
+			xr::ActionCreateInfo primary_button_action_info("primary_button", xr::ActionType::BooleanInput, static_cast<uint32_t>(input_action.hand_subaction_path.size()), input_action.hand_subaction_path.data(), "Primary Button");
+			input_action.primary_button_action = input_action.action_set.createAction(primary_button_action_info);
 
-			std::array<xr::Path, 2> primaryButtonPath = {
+			std::array<xr::Path, 2> primary_button_path = {
 				instance.stringToPath("/user/hand/left/input/x/click"),
 				instance.stringToPath("/user/hand/right/input/a/click"),
 			};
 
-			xr::ActionCreateInfo secondaryButtonActionInfo("secondary_button", xr::ActionType::BooleanInput, static_cast<uint32_t>(input_action.handSubactionPath.size()), input_action.handSubactionPath.data(), "Secondary Button");
-			input_action.secondaryButtonAction = input_action.actionSet.createAction(secondaryButtonActionInfo);
+			xr::ActionCreateInfo secondary_button_action_info("secondary_button", xr::ActionType::BooleanInput, static_cast<uint32_t>(input_action.hand_subaction_path.size()), input_action.hand_subaction_path.data(), "Secondary Button");
+			input_action.secondary_button_action = input_action.action_set.createAction(secondary_button_action_info);
 
-			std::array<xr::Path, 2> secondaryButtonPath = {
+			std::array<xr::Path, 2> secondary_button_path = {
 				instance.stringToPath("/user/hand/left/input/y/click"),
 				instance.stringToPath("/user/hand/right/input/b/click"),
 			};
 
-			xr::ActionCreateInfo thumbstickXActionInfo("thumbstick_x", xr::ActionType::FloatInput, static_cast<uint32_t>(input_action.handSubactionPath.size()), input_action.handSubactionPath.data(), "ThumbStick X");
-			input_action.thumbstickXAction = input_action.actionSet.createAction(thumbstickXActionInfo);
+			xr::ActionCreateInfo thumbstick_x_action_info("thumbstick_x", xr::ActionType::FloatInput, static_cast<uint32_t>(input_action.hand_subaction_path.size()), input_action.hand_subaction_path.data(), "ThumbStick X");
+			input_action.thumbstick_x_action = input_action.action_set.createAction(thumbstick_x_action_info);
 
-			std::array<xr::Path, 2> thumbstickXPath = {
+			std::array<xr::Path, 2> thumbstick_x_path = {
 				instance.stringToPath("/user/hand/left/input/thumbstick/x"),
 				instance.stringToPath("/user/hand/right/input/thumbstick/x"),
 			};
 
-			xr::ActionCreateInfo thumbstickYActionInfo("thumbstick_y", xr::ActionType::FloatInput, static_cast<uint32_t>(input_action.handSubactionPath.size()), input_action.handSubactionPath.data(), "ThumbStick Y");
-			input_action.thumbstickYAction = input_action.actionSet.createAction(thumbstickYActionInfo);
+			xr::ActionCreateInfo thumbstick_y_action_info("thumbstick_y", xr::ActionType::FloatInput, static_cast<uint32_t>(input_action.hand_subaction_path.size()), input_action.hand_subaction_path.data(), "ThumbStick Y");
+			input_action.thumbstick_y_action = input_action.action_set.createAction(thumbstick_y_action_info);
 
-			std::array<xr::Path, 2> thumbstickYPath = {
+			std::array<xr::Path, 2> thumbstick_y_path = {
 				instance.stringToPath("/user/hand/left/input/thumbstick/y"),
 				instance.stringToPath("/user/hand/right/input/thumbstick/y"),
 			};
 
-			xr::ActionCreateInfo vibrateActionInfo("vibrate", xr::ActionType::VibrationOutput, static_cast<uint32_t>(input_action.handSubactionPath.size()), input_action.handSubactionPath.data(), "Virbate");
-			input_action.vibrateAction = input_action.actionSet.createAction(vibrateActionInfo);
+			xr::ActionCreateInfo vibrate_action_info("vibrate", xr::ActionType::VibrationOutput, static_cast<uint32_t>(input_action.hand_subaction_path.size()), input_action.hand_subaction_path.data(), "Virbate");
+			input_action.vibrate_action = input_action.action_set.createAction(vibrate_action_info);
 
-			std::array<xr::Path, 2> vibratePath = {
+			std::array<xr::Path, 2> vibrate_path = {
 				instance.stringToPath("/user/hand/left/output/haptic"),
 				instance.stringToPath("/user/hand/right/output/haptic"),
 			};
 
-			xr::Path oculusTouchInteractionProfilePath = instance.stringToPath("/interaction_profiles/oculus/touch_controller");
+			xr::Path oculus_touch_interaction_profile_path = instance.stringToPath("/interaction_profiles/oculus/touch_controller");
 
 			std::vector<xr::ActionSuggestedBinding> binding = {
-				xr::ActionSuggestedBinding{ input_action.poseAction, posePath[0] },
-				xr::ActionSuggestedBinding{ input_action.poseAction, posePath[1] },
-				xr::ActionSuggestedBinding{ input_action.triggerAction, triggerPath[0] },
-				xr::ActionSuggestedBinding{ input_action.triggerAction, triggerPath[1] },
-				xr::ActionSuggestedBinding{ input_action.gripAction, gripPath[0] },
-				xr::ActionSuggestedBinding{ input_action.gripAction, gripPath[1] },
-				xr::ActionSuggestedBinding{ input_action.primaryButtonAction, primaryButtonPath[0] },
-				xr::ActionSuggestedBinding{ input_action.primaryButtonAction, primaryButtonPath[1] },
-				xr::ActionSuggestedBinding{ input_action.secondaryButtonAction, secondaryButtonPath[0] },
-				xr::ActionSuggestedBinding{ input_action.secondaryButtonAction, secondaryButtonPath[1] },
-				xr::ActionSuggestedBinding{ input_action.thumbstickXAction, thumbstickXPath[0] },
-				xr::ActionSuggestedBinding{ input_action.thumbstickXAction, thumbstickXPath[1] },
-				xr::ActionSuggestedBinding{ input_action.thumbstickYAction, thumbstickYPath[0] },
-				xr::ActionSuggestedBinding{ input_action.thumbstickYAction, thumbstickYPath[1] },
-				xr::ActionSuggestedBinding{ input_action.vibrateAction, vibratePath[0] },
-				xr::ActionSuggestedBinding{ input_action.vibrateAction, vibratePath[1] },
+				xr::ActionSuggestedBinding{ input_action.pose_action, pose_path[0] },
+				xr::ActionSuggestedBinding{ input_action.pose_action, pose_path[1] },
+				xr::ActionSuggestedBinding{ input_action.trigger_action, trigger_path[0] },
+				xr::ActionSuggestedBinding{ input_action.trigger_action, trigger_path[1] },
+				xr::ActionSuggestedBinding{ input_action.grip_action, grip_path[0] },
+				xr::ActionSuggestedBinding{ input_action.grip_action, grip_path[1] },
+				xr::ActionSuggestedBinding{ input_action.primary_button_action, primary_button_path[0] },
+				xr::ActionSuggestedBinding{ input_action.primary_button_action, primary_button_path[1] },
+				xr::ActionSuggestedBinding{ input_action.secondary_button_action, secondary_button_path[0] },
+				xr::ActionSuggestedBinding{ input_action.secondary_button_action, secondary_button_path[1] },
+				xr::ActionSuggestedBinding{ input_action.thumbstick_x_action, thumbstick_x_path[0] },
+				xr::ActionSuggestedBinding{ input_action.thumbstick_x_action, thumbstick_x_path[1] },
+				xr::ActionSuggestedBinding{ input_action.thumbstick_y_action, thumbstick_y_path[0] },
+				xr::ActionSuggestedBinding{ input_action.thumbstick_y_action, thumbstick_y_path[1] },
+				xr::ActionSuggestedBinding{ input_action.vibrate_action, vibrate_path[0] },
+				xr::ActionSuggestedBinding{ input_action.vibrate_action, vibrate_path[1] },
 			};
-			xr::InteractionProfileSuggestedBinding suggestedBinding(oculusTouchInteractionProfilePath, static_cast<uint32_t>(binding.size()), binding.data());
-			instance.suggestInteractionProfileBindings(suggestedBinding);
+			xr::InteractionProfileSuggestedBinding suggested_binding(oculus_touch_interaction_profile_path, static_cast<uint32_t>(binding.size()), binding.data());
+			instance.suggestInteractionProfileBindings(suggested_binding);
 
-			xr::ActionSpaceCreateInfo actionSpaceInfo(input_action.poseAction, { }, { });
-			actionSpaceInfo.subactionPath = input_action.handSubactionPath[0];
-			input_action.handSpace[0] = session.createActionSpace(actionSpaceInfo);
-			actionSpaceInfo.subactionPath = input_action.handSubactionPath[1];
-			input_action.handSpace[1] = session.createActionSpace(actionSpaceInfo);
+			xr::ActionSpaceCreateInfo action_space_info(input_action.pose_action, { }, { });
+			action_space_info.subactionPath = input_action.hand_subaction_path[0];
+			input_action.hand_space[0] = session.createActionSpace(action_space_info);
+			action_space_info.subactionPath = input_action.hand_subaction_path[1];
+			input_action.hand_space[1] = session.createActionSpace(action_space_info);
 
-			xr::SessionActionSetsAttachInfo attachInfo(1, &input_action.actionSet);
-			session.attachSessionActionSets(attachInfo);
+			xr::SessionActionSetsAttachInfo attach_info(1, &input_action.action_set);
+			session.attachSessionActionSets(attach_info);
 		}
 
-		auto handle_session_state_changed_event(xr::EventDataSessionStateChanged eventDataSessionStateChanged) -> bool {
-			auto oldState = session_state;
-			session_state = eventDataSessionStateChanged.state;
-			log_info("OpenXR", std::format("Session State Changed: {} -> {}", xr::to_string(oldState), xr::to_string(session_state)), 0);
+		auto handle_session_state_changed_event(xr::EventDataSessionStateChanged event_data_session_state_changed) -> bool {
+			auto old_state = session_state;
+			session_state = event_data_session_state_changed.state;
+			log_info("OpenXR", std::format("Session State Changed: {} -> {}", xr::to_string(old_state), xr::to_string(session_state)), 0);
 
 			switch (session_state)
 			{
 			case xr::SessionState::Ready:
 			{
-				xr::SessionBeginInfo sessionBeginInfo(xr::ViewConfigurationType::PrimaryStereo);
-				session.beginSession(sessionBeginInfo);
+				xr::SessionBeginInfo session_begin_info(xr::ViewConfigurationType::PrimaryStereo);
+				session.beginSession(session_begin_info);
 				session_running = true;
 				break;
 			}
@@ -529,8 +529,8 @@ namespace arx
 
 	public:
 		auto vibrate(const xr::HapticVibration& virbation, int hand) -> void {
-			xr::HapticActionInfo hapticInfo(input_action.vibrateAction, input_action.handSubactionPath[hand]);
-			if (session.applyHapticFeedback(hapticInfo, virbation.get_base()) != xr::Result::Success)
+			xr::HapticActionInfo haptic_info(input_action.vibrate_action, input_action.hand_subaction_path[hand]);
+			if (session.applyHapticFeedback(haptic_info, virbation.get_base()) != xr::Result::Success)
 			{
 				throw std::runtime_error("failed to vibrate.");
 			}

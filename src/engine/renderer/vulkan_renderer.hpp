@@ -179,17 +179,12 @@ namespace arx
 
 				command_buffer.beginRenderPass(swap_chains[view]->get_render_pass_begin_info(image_index), vk::SubpassContents::eInline);		// <======= Render Pass Begin. TODO: use subpasses.
 
-				bool haveText = false;
-				bool haveMesh = (debug_mode != DebugMode::OnlyDebug) && !mesh_models.empty();
-				bool haveUI = !ui_elements.empty();
-				bool haveDebug = (debug_mode != DebugMode::NoDebug) && !debug_mesh_models.empty();
+				bool have_text = false;
+				bool have_mesh = (debug_mode != DebugMode::OnlyDebug) && !mesh_models.empty();
+				bool have_ui = !ui_elements.empty();
+				bool have_debug = (debug_mode != DebugMode::NoDebug) && !debug_mesh_models.empty();
 
 				glm::mat4 mat_camera_view = glm::inverse(mat_camera_transform);
-
-				//	haveText |= !(scene->debugMode == SceneDebugMode::eDebugOnly || scene->texts.empty());
-				//	haveMesh |= !(scene->debugMode == SceneDebugMode::eDebugOnly || scene->models.empty());
-				//	haveUI |= !(scene->uiElements.empty());	// No `scene->onlyDebug` like above because we till want to have UI even in debug view.
-				//	haveDebug |= debugOn(scene->debugMode) && !(scene->debugScene == nullptr || scene->debugScene->models.empty());
 
 				/*if (haveText)
 				{
@@ -246,7 +241,7 @@ namespace arx
 					// End Draw.
 				}*/
 
-				if (haveMesh)
+				if (have_mesh)
 				{
 					command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.mesh_pipeline);			// <======= Bind Mesh Pipeline.
 
@@ -280,7 +275,7 @@ namespace arx
 					// End Draw.
 				}
 
-				if (haveUI)
+				if (have_ui)
 				{
 					command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.ui_pipeline);			// <======= Bind Mesh Pipeline.
 
@@ -314,7 +309,7 @@ namespace arx
 					// End Draw.
 				}
 
-				if (haveDebug)
+				if (have_debug)
 				{
 					command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipelines.wireframe_pipeline);			// <======= Bind Mesh Pipeline.
 
@@ -540,7 +535,7 @@ namespace arx
 			};
 		}
 		auto create_bitmap(const std::string& font_path, uint32_t width = 1024, uint32_t height = 1024, float pixelHeight = 150.f) -> Bitmap* {
-			auto font_buffer = readFile(font_path);
+			auto font_buffer = read_file(font_path);
 			std::vector<stbi_uc> single_channel_bitmap_data(static_cast<size_t>(width * height));
 			std::vector<stbi_uc> rgba_bitmap_data(static_cast<size_t>(width * height) * 4);
 			std::array<Bitmap::CharInfo, 128> char_infos;
@@ -1183,22 +1178,22 @@ namespace arx
 		}
 		auto create_graphics_pipelines() -> void {
 			log_step("Vulkan", "Loading Shader Modules");
-			auto meshVertShaderCode = readFile("shaders/mesh.vert.spv");
-			auto meshFragShaderCode = readFile("shaders/mesh.frag.spv");
+			auto meshVertShaderCode = read_file("shaders/mesh.vert.spv");
+			auto meshFragShaderCode = read_file("shaders/mesh.frag.spv");
 			vk::ShaderModuleCreateInfo meshVertInfo({ }, meshVertShaderCode);
 			vk::ShaderModuleCreateInfo meshFragInfo({ }, meshFragShaderCode);
 			auto meshVertShaderModule = device.createShaderModule(meshVertInfo);
 			auto meshFragShaderModule = device.createShaderModule(meshFragInfo);
 
-			auto textVertShaderCode = readFile("shaders/text.vert.spv");
-			auto textFragShaderCode = readFile("shaders/text.frag.spv");
+			auto textVertShaderCode = read_file("shaders/text.vert.spv");
+			auto textFragShaderCode = read_file("shaders/text.frag.spv");
 			vk::ShaderModuleCreateInfo textVertInfo({ }, textVertShaderCode);
 			vk::ShaderModuleCreateInfo textFragInfo({ }, textFragShaderCode);
 			auto textVertShaderModule = device.createShaderModule(textVertInfo);
 			auto textFragShaderModule = device.createShaderModule(textFragInfo);
 
-			auto uiVertShaderCode = readFile("shaders/ui.vert.spv");
-			auto uiFragShaderCode = readFile("shaders/ui.frag.spv");
+			auto uiVertShaderCode = read_file("shaders/ui.vert.spv");
+			auto uiFragShaderCode = read_file("shaders/ui.frag.spv");
 			vk::ShaderModuleCreateInfo uiVertInfo({ }, uiVertShaderCode);
 			vk::ShaderModuleCreateInfo uiFragInfo({ }, uiFragShaderCode);
 			auto uiVertShaderModule = device.createShaderModule(uiVertInfo);
@@ -1522,7 +1517,7 @@ namespace arx
 			device.destroyBuffer(buffer);
 			device.freeMemory(memory);
 		}
-		auto destroyImage(vk::Image& image, vk::DeviceMemory& memory) -> void
+		auto destroy_image(vk::Image& image, vk::DeviceMemory& memory) -> void
 		{
 			device.destroyImage(image);
 			device.freeMemory(memory);
@@ -1774,7 +1769,7 @@ namespace arx
 			device.freeCommandBuffers(command_pool, command_buffers);
 		}
 
-		static auto readFile(const std::string& filepath) -> std::vector<uint32_t> {
+		static auto read_file(const std::string& filepath) -> std::vector<uint32_t> {
 			std::ifstream file{ filepath, std::ios::ate | std::ios::binary };
 
 			if (!file.is_open())
@@ -1826,7 +1821,6 @@ namespace arx
 		} pipelines;
 		vk::CommandPool command_pool;
 		vk::CommandBuffer command_buffer;
-		// std::vector<std::vector<hd::MeshModel>> preservedModels;	// models are preserved by a commandBuffer when they are being drawn.
 		vk::Semaphore draw_done;
 		std::vector<vk::Fence> in_flights;
 		std::vector<Swapchain*> swap_chains;

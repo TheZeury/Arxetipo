@@ -245,7 +245,6 @@ namespace arx
 						&entities.test_sphere.transform,
 						true
 					},
-					.point_interactable = XRPointInteractable{ &entities.test_sphere.rigid_dynamic },
 					.grab_interactable = XRGrabInteractable{ &entities.test_sphere.rigid_dynamic },
 				},
 			}
@@ -281,7 +280,6 @@ namespace arx
 			entities.panel.slider.slider.register_to_systems(&systems.xr_system);
 			entities.panel.grab_interactable.register_to_systems(&systems.xr_system);
 			entities.typewriter.typewriter.register_to_systems(&systems.xr_system);
-			entities.test_sphere.point_interactable.register_to_systems(&systems.xr_system);
 			entities.test_sphere.grab_interactable.register_to_systems(&systems.xr_system);
 
 			entities.xr_controllers.left.rigid_static.register_to_systems(&systems.physics_system);
@@ -314,6 +312,67 @@ namespace arx
 			entities.panel.slider.slider.on_value_changed = [&](float value) {
 				entities.panel.text.text.set_content(std::to_string(value));
 			};
+
+			command_runtime->kernel.add_method("teleport", [&](const std::vector<arx::CommandValue>& arguments, arx::CommandValue& result) {
+				if (arguments.size() != 3) {
+					throw arx::CommandException{ "`teleport` requires 3 arguments. \nHint: `teleport` is used to set xr_offset. \nUsage: `teleport(x, y, z)`" };
+				}
+				for (auto& argument : arguments) {
+					if (argument.type != arx::CommandValue::Type::Number) {
+						throw arx::CommandException{ "coordinates must be numbers. \nHint: `teleport` is used to set xr_offset. \nUsage: `teleport(x, y, z)`" };
+					}
+				}
+				entities.xr_offset.set_local_position({ std::get<float>(arguments[0].value), std::get<float>(arguments[1].value), std::get<float>(arguments[2].value) });
+				}, true);
+
+			command_runtime->kernel.add_method("say", [&](const std::vector<arx::CommandValue>& arguments, arx::CommandValue& result) {
+				if (arguments.size() != 1) {
+					throw arx::CommandException{ "`say` requires 1 argument." };
+				}
+				auto words = arguments[0].to_string();
+				entities.panel.text.text.set_content(words);
+				}, true);
+
+			command_runtime->kernel.add_method("move", [&](const std::vector<arx::CommandValue>& arguments, arx::CommandValue& result) {
+				if (arguments.size() != 4) {
+					throw arx::CommandException{ "`move` requires 4 arguments. \nHint: `move`, different from `teleport`, is used to move rigid actors. \nUsage: `move(\"name_of_an_object\", x, y, z)`" };
+				}
+				if (arguments[0].type != arx::CommandValue::Type::String) {
+					throw arx::CommandException{ "first argument must be a string as a object's name. \nHint: `move`, different from `teleport`, is used to move rigid actors. \nUsage: `move(\"name_of_an_object\", x, y, z)`" };
+				}
+				for (size_t i = 1; i < arguments.size(); ++i) {
+					if (arguments[i].type != arx::CommandValue::Type::Number) {
+						throw arx::CommandException{ "coordinates must be numbers. \nHint: `move`, different from `teleport`, is used to move rigid actors. \nUsage: `move(\"name_of_an_object\", x, y, z)`" };
+					}
+				}
+				auto name = std::get<std::string>(arguments[0].value);
+				if (name != "test_sphere") {
+					throw arx::CommandException{ "object not found." };
+				}
+				entities.test_sphere.rigid_dynamic.rigid_dynamic->setGlobalPose({ std::get<float>(arguments[1].value), std::get<float>(arguments[2].value), std::get<float>(arguments[3].value) });
+				}, true);
+
+			command_runtime->kernel.add_method("debug_mode", [&](const std::vector<arx::CommandValue>& arguments, arx::CommandValue& result) {
+				if (arguments.size() != 1) {
+					throw arx::CommandException{ "`debug_mode` requires 1 argument. \nHint: `debug_mode` is used to set debug mode. \nUsage: `debug_mode(\"NoDebug\"/\"OnlyDebug\"/\"Mixed\")`" };
+				}
+				if (arguments[0].type != arx::CommandValue::Type::String) {
+					throw arx::CommandException{ "argument must be a boolean. \nHint: `debug_mode` is used to set debug mode. \nUsage: `debug_mode(\"NoDebug\"/\"OnlyDebug\"/\"Mixed\")`" };
+				}
+				auto debug_mode = std::get<std::string>(arguments[0].value);
+				if (debug_mode == "NoDebug") {
+					renderer->debug_mode = arx::VulkanRenderer::DebugMode::NoDebug;
+				}
+				else if (debug_mode == "OnlyDebug") {
+					renderer->debug_mode = arx::VulkanRenderer::DebugMode::OnlyDebug;
+				}
+				else if (debug_mode == "Mixed") {
+					renderer->debug_mode = arx::VulkanRenderer::DebugMode::Mixed;
+				}
+				else {
+					throw arx::CommandException{ "argument must be \"NoDebug\"/\"OnlyDebug\"/\"Mixed\". \nHint: `debug_mode` is used to set debug mode. \nUsage: `debug_mode(\"NoDebug\"/\"OnlyDebug\"/\"Mixed\")`" };
+				}
+				}, true);
 		}
 
 		auto mobilize() -> void {
@@ -413,7 +472,6 @@ namespace arx
 				SpaceTransform transform;
 				MeshModelComponent mesh_model;
 				RigidDynamicComponent rigid_dynamic;
-				XRPointInteractable point_interactable;
 				XRGrabInteractable grab_interactable;
 			} test_sphere;
 		} entities;

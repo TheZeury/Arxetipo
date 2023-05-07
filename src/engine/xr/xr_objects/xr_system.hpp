@@ -22,8 +22,8 @@ namespace arx
 		auto update() -> void {
 			xr_plugin->poll_actions();
 			for (auto [controller_id, transform] : controllers) {
-				transform->set_local_position(cnv<glm::vec3>(xr_plugin->input_state.handLocations[controller_id].pose.position));
-				transform->set_local_rotation(cnv<glm::quat>(xr_plugin->input_state.handLocations[controller_id].pose.orientation));
+				transform->set_local_position(cnv<glm::vec3>(xr_plugin->input_state.hand_locations[controller_id].pose.position));
+				transform->set_local_rotation(cnv<glm::quat>(xr_plugin->input_state.hand_locations[controller_id].pose.orientation));
 			}
 			for (auto interactor : interactors) {
 				interactor->pass_actions();
