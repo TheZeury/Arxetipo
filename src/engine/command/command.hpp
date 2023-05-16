@@ -12,6 +12,7 @@
 #include <functional>
 #include <unordered_set>
 #include <optional>
+#include <memory>
 
 namespace arx 
 {
@@ -35,4 +36,5 @@ namespace arx
 #include "command_kernel.hpp"
 #include "command_reader.hpp"
 #include "command_parser.hpp"
+#include "command_ast_printer.hpp"
 #include "command_runtime.hpp"

@@ -14,15 +14,21 @@ namespace arx
 		bool exit = false;
 
 		CommandRuntime(std::istream& input, std::ostream& output, std::ostream& error = std::cerr) : input{ input }, output{ output }, error{ error }, kernel{}, parser{ kernel }, lexer{ parser } {
-			kernel.add_method("print", [&](const std::vector<CommandValue>& arguments, CommandValue& result) {
+			kernel.add_function("print", [&](const std::vector<CommandValue>& arguments, CommandValue* result) -> uint32_t {
 				for (const auto& argument : arguments) {
 					output << argument.to_string() << std::endl;
 				}
-				result = CommandValue{ CommandValue::Type::Empty, std::monostate{} };
+				if (result != nullptr) {
+					*result = CommandValue{ CommandValue::Type::Empty, std::monostate{} };
+				}
+				return 0;
 			}, true);
-			kernel.add_method("exit", [&](const std::vector<CommandValue>& arguments, CommandValue& result) {
+			kernel.add_function("exit", [&](const std::vector<CommandValue>& arguments, CommandValue* result) -> uint32_t {
 				exit = true;
-				result = CommandValue{ CommandValue::Type::Empty, std::monostate{} };
+				if (result != nullptr) {
+					*result = CommandValue{ CommandValue::Type::Empty, std::monostate{} };
+				}
+				return 0;
 			}, true);
 		}
 
@@ -44,9 +50,7 @@ namespace arx
 			}
 			catch (const CommandException& exception) {
 				error << exception.what() << std::endl;
-				while (parser.awaiting_nodes.size() > 1) {
-					parser.awaiting_nodes.pop();
-				}
+				parser.awaiting_expression = CommandASTExpressionNode::make_empty();
 				while (parser.processing_nodes.size() > 1) {
 					parser.processing_nodes.pop();
 				}

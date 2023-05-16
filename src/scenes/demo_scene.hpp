@@ -313,7 +313,7 @@ namespace arx
 				entities.panel.text.text.set_content(std::to_string(value));
 			};
 
-			command_runtime->kernel.add_method("teleport", [&](const std::vector<arx::CommandValue>& arguments, arx::CommandValue& result) {
+			/*command_runtime->kernel.add_method("teleport", [&](const std::vector<arx::CommandValue>& arguments, arx::CommandValue& result) {
 				if (arguments.size() != 3) {
 					throw arx::CommandException{ "`teleport` requires 3 arguments. \nHint: `teleport` is used to set xr_offset. \nUsage: `teleport(x, y, z)`" };
 				}
@@ -372,7 +372,7 @@ namespace arx
 				else {
 					throw arx::CommandException{ "argument must be \"NoDebug\"/\"OnlyDebug\"/\"Mixed\". \nHint: `debug_mode` is used to set debug mode. \nUsage: `debug_mode(\"NoDebug\"/\"OnlyDebug\"/\"Mixed\")`" };
 				}
-				}, true);
+				}, true);*/
 		}
 
 		auto mobilize() -> void {

@@ -10,10 +10,28 @@ namespace arx
 			Number,
 			String,
 			List,
-			Method,
+			Function,
 		};
 		Type type;
-		std::variant<std::monostate, float, std::string, std::vector<CommandValue>, std::function<void(const std::vector<CommandValue>&, CommandValue&)>> value;
+		std::variant<
+			std::monostate, 
+			float, 
+			std::string, 
+			std::vector<CommandValue>, 
+			std::function<uint32_t(const std::vector<CommandValue>&, CommandValue*)>
+		> value;
+
+		CommandValue(
+			Type type = Type::Empty, 
+			std::variant<
+				std::monostate,
+				float,
+				std::string,
+				std::vector<CommandValue>,
+				std::function<uint32_t(const std::vector<CommandValue>&, CommandValue*)>
+			> value = std::monostate{ }
+		) : type{ type }, value{ value } {
+		}
 
 		auto to_string() const -> std::string {
 			switch (type) {
@@ -38,8 +56,8 @@ namespace arx
 				result += "]";
 				return result;
 			}
-			case Type::Method: {
-				return "method";
+			case Type::Function: {
+				return "function";
 			}
 			default: {
 				return "unknown";
@@ -109,18 +127,21 @@ namespace arx
 
 	struct CommandKernel
 	{
-		std::vector<std::unordered_map<std::string, CommandValue>> scope_stack{ 1 };
-		std::unordered_set<std::string> scope_wide_protected;
+		struct StackFrame {
+			std::unordered_map<std::string, CommandValue> identifiers;
+			std::unordered_set<std::string> protections;
+		};
+		std::vector<StackFrame> scope_stack{ 1 };
 
-		auto add_method(const std::string& name, const std::function<void(const std::vector<CommandValue>&, CommandValue&)>& method, bool protect = false) -> CommandKernel& {
-			scope_stack.rbegin()->insert({ name, CommandValue{ CommandValue::Type::Method, method } });
+		auto add_function(const std::string& name, const std::function<uint32_t(const std::vector<CommandValue>&, CommandValue*)>& function, bool protect = false) -> CommandKernel& {
+			scope_stack.rbegin()->identifiers.insert({ name, CommandValue{ CommandValue::Type::Function, function } });
 			if (protect) {
-				scope_wide_protected.insert(name);
+				scope_stack.rbegin()->protections.insert(name);
 			}
 			return *this;
 		}
 
-		auto add_number(const std::string& name, float value, bool protect = false) -> CommandKernel& {
+		/*auto add_number(const std::string& name, float value, bool protect = false) -> CommandKernel& {
 			scope_stack.rbegin()->insert({ name, CommandValue{ CommandValue::Type::Number, value } });
 			if (protect) {
 				scope_wide_protected.insert(name);
@@ -134,222 +155,341 @@ namespace arx
 				scope_wide_protected.insert(name); 
 			}
 			return *this;
+		}*/
+
+		auto find_identifier_or_insert(const std::string& name) -> std::pair<CommandValue&, bool> {
+			auto is_protected = false;
+			for (auto it = scope_stack.rbegin(); it != scope_stack.rend(); ++it) {
+				if (it->protections.find(name) != it->protections.end()) {
+					is_protected = true;
+				}
+				auto find = it->identifiers.find(name);
+				if (find != it->identifiers.end()) {
+					return { find->second, is_protected };
+				}
+			}
+			scope_stack.rbegin()->identifiers.insert({ name, CommandValue{ CommandValue::Type::Empty, std::monostate{ } } });
+			return { scope_stack.rbegin()->identifiers.at(name), false }; // false, not `is_protected`. 
+		}
+		
+		auto find_identifier_or_throw(const std::string& name) -> std::pair<CommandValue&, bool> {
+			auto is_protected = false;
+			for (auto it = scope_stack.rbegin(); it != scope_stack.rend(); ++it) {
+				if (it->protections.find(name) != it->protections.end()) {
+					is_protected = true;
+				}
+				auto find = it->identifiers.find(name);
+				if (find != it->identifiers.end()) {
+					return { find->second, is_protected };
+				}
+			}
+			throw CommandException("Non-exist identifier {}.", name);
 		}
 
 		auto operator<<(const CommandASTStatementNode& statement) -> CommandKernel& {
-			switch (statement.type) {
-			case CommandASTStatementNode::Type::Expression: {
-				excute_expression(std::get<CommandASTExpressionNode>(statement.value));
-				break;
-			}
-			case CommandASTStatementNode::Type::Assignment: {
-				excute_assignment(std::get<CommandASTAssignmentNode>(statement.value));
-				break;
-			}
-			case CommandASTStatementNode::Type::Protection: {
-				scope_wide_protected.insert(std::get<CommandASTProtectionNode>(statement.value).name);
-				break;
-			}
-			case CommandASTStatementNode::Type::Argument: {
-				excute_argument(std::get<CommandASTArgumentNode>(statement.value));
-				break;
-			}
-			case CommandASTStatementNode::Type::Return: {
-				excute_return(std::get<CommandASTReturnNode>(statement.value));
-				break;
-			}
-			case CommandASTStatementNode::Type::Delete: {
-				excute_delete(std::get<CommandASTDeleteNode>(statement.value));
-				break;
-			}
-			default: {
-				throw CommandException("Unexcutable statement type.");
-				break;
-			}
-			}
+			excute_statement(statement);
 			return *this;
 		}
 
-		auto excute_expression(const CommandASTExpressionNode& expression) -> CommandValue {
+		auto excute_statement(const CommandASTStatementNode& statement) -> uint32_t {
+			switch (statement.type) {
+			case CommandASTStatementNode::Type::Empty: {
+				return 0;
+			}
+			case CommandASTStatementNode::Type::Expression: {
+				return excute_expression(std::get<CommandASTExpressionNode>(statement.value), nullptr);
+			}
+			default: {
+				throw CommandException("Unknown statement type.");
+			}
+			}
+		}
+
+		auto excute_expression(const CommandASTExpressionNode& expression, CommandValue* result) -> uint32_t {
 			switch (expression.type) {
 			case CommandASTExpressionNode::Type::Empty: {
-				return CommandValue{ CommandValue::Type::Empty, std::monostate{ } };
+				if (result != nullptr) {
+					*result = CommandValue{ CommandValue::Type::Empty, std::monostate{ } };
+				}
+				return 0;
 			}
 			case CommandASTExpressionNode::Type::Number: {
-				return CommandValue{ CommandValue::Type::Number, std::get<CommandASTNumberNode>(expression.value).value };
+				if (result != nullptr) {
+					*result = CommandValue{ CommandValue::Type::Number, std::get<CommandASTNumberNode>(expression.value).value };
+				}
+				return 0;
 			}
 			case CommandASTExpressionNode::Type::String: {
-				return CommandValue{ CommandValue::Type::String, std::get<CommandASTStringNode>(expression.value).value };
+				if (result != nullptr) {
+					*result = CommandValue{ CommandValue::Type::String, std::get<CommandASTStringNode>(expression.value).value };
+				}
+				return 0;
 			}
 			case CommandASTExpressionNode::Type::Identifier: {
-				for (auto scope = scope_stack.rbegin(); scope != scope_stack.rend(); ++scope) {
-					if (scope->find(std::get<CommandASTIdentifierNode>(expression.value).name) != scope->end()) {
-						return scope->at(std::get<CommandASTIdentifierNode>(expression.value).name);
-					}
-				}
-				//std::cerr << "Identifier " << std::get<CommandASTIdentifierNode>(expression.value).name << " not found." << std::endl;
-				scope_stack.rbegin()->insert({ std::get<CommandASTIdentifierNode>(expression.value).name, CommandValue{ CommandValue::Type::Empty, std::monostate{ } } });
-				return scope_stack.rbegin()->at(std::get<CommandASTIdentifierNode>(expression.value).name);
-			}
-			case CommandASTExpressionNode::Type::MethodCall: {
-				const auto& method = excute_expression(*(std::get<CommandASTMethodCallNode>(expression.value).method_body));
-				if (method.type != CommandValue::Type::Method) {
-					throw CommandException("Trying to call a non-method.");
-					// Maybe we can allow calling a non-method but return a empty value? TODO.
-				}
-				std::vector<CommandValue> arguments;
-				for (auto& argument : std::get<CommandASTMethodCallNode>(expression.value).arguments) {
-					arguments.push_back(excute_expression(argument));
-				}
-				CommandValue result;
-				std::get<std::function<void(const std::vector<CommandValue>&, CommandValue&)>>(method.value)(arguments, result);
-				return result;
-			}
-			case CommandASTExpressionNode::Type::Parentheses: {
-				return excute_expression(std::get<CommandASTParenthesesNode>(expression.value).expressions[0]);
-				break;
+				return excute_identifier(std::get<CommandASTIdentifierNode>(expression.value), result);
 			}
 			case CommandASTExpressionNode::Type::Operation: {
-				auto& operation = std::get<CommandASTOperationNode>(expression.value);
+				return excute_operation(std::get<CommandASTOperationNode>(expression.value), result);
+			}
+			case CommandASTExpressionNode::Type::List: {
+				return excute_list(std::get<CommandASTListNode>(expression.value), result);
+			}
+			case CommandASTExpressionNode::Type::Parentheses: {
+				return excute_expression(*(std::get<CommandASTParenthesesNode>(expression.value).expression), result);
+			}
+			case CommandASTExpressionNode::Type::FunctionCall: {
+				return excute_function_call(std::get<CommandASTFunctionCallNode>(expression.value), result);
+			}
+			case CommandASTExpressionNode::Type::FunctionBody: {
+				return excute_function_body(std::get<CommandASTFunctionBodyNode>(expression.value), result);
+			}
+			case CommandASTExpressionNode::Type::Assignment: {
+				return excute_assignment(std::get<CommandASTAssignmentNode>(expression.value), result);
+			}
+			case CommandASTExpressionNode::Type::Protection: {
+				return excute_protection(std::get<CommandASTProtectionNode>(expression.value), result);
+			}
+			case CommandASTExpressionNode::Type::Delete: {
+				return excute_delete(std::get<CommandASTDeleteNode>(expression.value), result);
+			}
+			case CommandASTExpressionNode::Type::Argument: {
+				return excute_argument(std::get<CommandASTArgumentNode>(expression.value), result);
+			}
+			case CommandASTExpressionNode::Type::Return: {
+				return excute_return(std::get<CommandASTReturnNode>(expression.value), result);
+			}
+			default: {
+				throw CommandException("Unexcutable expression type.");
+			}
+			}
+		}
+
+		auto excute_identifier(const CommandASTIdentifierNode& identifier, CommandValue* result) -> uint32_t {
+			for (auto scope = scope_stack.rbegin(); scope != scope_stack.rend(); ++scope) {
+				if (scope->identifiers.find(identifier.name) != scope->identifiers.end()) {
+					if (result != nullptr) {
+						*result = scope->identifiers.at(identifier.name);
+					}
+					return 0;
+				}
+			}
+			scope_stack.rbegin()->identifiers.insert({
+				identifier.name,
+				CommandValue{ CommandValue::Type::Empty, std::monostate{ } }
+			});
+			if (result != nullptr) {
+				*result = scope_stack.rbegin()->identifiers.at(identifier.name);
+			}
+			return 0;
+		}
+
+		auto excute_operation(const CommandASTOperationNode& operation, CommandValue* result) -> uint32_t {
+			std::vector<CommandValue> operand_results(operation.operands.size());
+			for (size_t i = 0; i < operation.operands.size(); ++i) {
+				auto return_level = excute_expression(operation.operands[i], &operand_results[i]);
+				if (return_level != 0) {
+					return return_level;
+				}
+			}
+
+			if (result != nullptr) {
 				switch (operation.type)
 				{
 				case CommandASTOperationNode::Type::Add: {
-					return excute_expression(operation.operands[0]) + excute_expression(operation.operands[1]);
+					*result = operand_results[0] + operand_results[1];
+					break;
 				}
 				case CommandASTOperationNode::Type::Subtract: {
-					return excute_expression(operation.operands[0]) - excute_expression(operation.operands[1]);
+					*result = operand_results[0] - operand_results[1];
+					break;
 				}
 				case CommandASTOperationNode::Type::Multiply: {
-					return excute_expression(operation.operands[0]) * excute_expression(operation.operands[1]);
+					*result = operand_results[0] * operand_results[1];
+					break;
 				}
 				case CommandASTOperationNode::Type::Divide: {
-					return excute_expression(operation.operands[0]) / excute_expression(operation.operands[1]);
+					*result = operand_results[0] / operand_results[1];
+					break;
 				}
 				case CommandASTOperationNode::Type::Positive: {
-					return excute_expression(operation.operands[0]);
+					*result = +operand_results[0];
+					break;
 				}
 				case CommandASTOperationNode::Type::Negative: {
-					return -excute_expression(operation.operands[0]);
+					*result = -operand_results[0];
+					break;
 				}
 				default:
 					throw CommandException("Unknow operation.");
 				}
-				break;
 			}
-			case CommandASTExpressionNode::Type::MethodBody: {
-				// shard_ptr is the best of the bests!!!!!!!!!!!!!!!!!
-				// I love it!!!!!!!!!!!!!!!!!!!!!
-				// It solved a problem on which I spent hours!!!!!!!!!!!!!!!!!
-				std::shared_ptr<CommandASTMethodBodyNode> method_body = std::make_shared<CommandASTMethodBodyNode>(std::get<CommandASTMethodBodyNode>(expression.value).clone());
-				auto method = [&, method_body](const std::vector<CommandValue>& arguments, CommandValue& result) {
-					if (scope_stack.size() >= 1000) {
-						throw CommandException("Stack overflow.");
-					}
-					scope_stack.push_back({ });
-					scope_stack.back().insert({ "@", CommandValue{ CommandValue::Type::List, arguments } });
-					scope_stack.back().insert({ "@i", CommandValue{ CommandValue::Type::Number, 0.f } });
-					for (auto& statement : method_body->commands) {
-						*this << statement;
-						if (statement.type == CommandASTStatementNode::Type::Return) {
-							break;
-						}
-					}
-					result = scope_stack.back().find("&") != scope_stack.back().end() ? scope_stack.back().at("&") : CommandValue{CommandValue::Type::Empty, std::monostate{}};
-					scope_stack.pop_back();
-				};
-				return CommandValue{ CommandValue::Type::Method, method };
-				break;
-			}
-			default: {
-				throw CommandException("Unexcutable expression type.");
-				break;
-			}
-			}
+			return 0;
 		}
 
-		auto excute_assignment(const CommandASTAssignmentNode& assignment) -> void {
-			if (scope_wide_protected.contains(assignment.name)) {
+		auto excute_list(const CommandASTListNode& list, CommandValue* result) -> uint32_t {
+			//std::vector<CommandValue> element_results(list.expressions.size());
+			if (result != nullptr) {
+				*result = CommandValue{ CommandValue::Type::List, std::vector<CommandValue>(list.expressions.size()) };
+				auto& element_results = std::get<std::vector<CommandValue>>(result->value);
+				for (size_t i = 0; i < list.expressions.size(); ++i) {
+					auto return_level = excute_expression(list.expressions[i], &element_results[i]);
+					if (return_level != 0) {
+						return return_level;
+					}
+				}
+			}
+			else {
+				for (size_t i = 0; i < list.expressions.size(); ++i) {
+					auto return_level = excute_expression(list.expressions[i], nullptr);
+					if (return_level != 0) {
+						return return_level;
+					}
+				}
+			}
+			return 0;
+		}
+
+		auto excute_function_call(const CommandASTFunctionCallNode& function_call, CommandValue* result) -> uint32_t {
+			CommandValue function;
+			auto return_level = excute_expression(*(function_call.function_body), &function);
+			if (return_level != 0) {
+				return return_level;
+			}
+
+			if (function.type != CommandValue::Type::Function) {
+				throw CommandException("Trying to call a non-function.");
+			}
+
+			CommandValue argument;
+			return_level = excute_expression(*(function_call.argument), &argument);
+			if (return_level != 0) {
+				return return_level;
+			}
+
+			if (argument.type == CommandValue::Type::List) {
+				const auto& arguments = std::get<std::vector<CommandValue>>(argument.value);
+				return std::get<std::function<uint32_t(const std::vector<CommandValue>&, CommandValue*)>>(function.value)(arguments, result);
+			}
+			else {
+				return std::get<std::function<uint32_t(const std::vector<CommandValue>&, CommandValue*)>>(function.value)({ argument }, result);
+			}
+			return 0;
+		}
+
+		auto excute_function_body(const CommandASTFunctionBodyNode& body, CommandValue* result) -> uint32_t {
+			// shard_ptr is the best of the bests!!!!!!!!!!!!!!!!!
+			// I love it!!!!!!!!!!!!!!!!!!!!!
+			// It solved a problem on which I spent hours!!!!!!!!!!!!!!!!!
+			if (result == nullptr) {
+				return 0;
+			}
+			std::shared_ptr<CommandASTFunctionBodyNode> function_body = std::make_shared<CommandASTFunctionBodyNode>(body.clone());
+			auto function = [&, function_body](const std::vector<CommandValue>& arguments, CommandValue* result) -> uint32_t {
+				if (scope_stack.size() >= 1000) {
+					throw CommandException("Stack overflow.");
+				}
+				scope_stack.push_back({ });
+				scope_stack.back().identifiers.insert({ "@", CommandValue{ CommandValue::Type::List, arguments } });
+				scope_stack.back().identifiers.insert({ "@i", CommandValue{ CommandValue::Type::Number, 0.f } });
+				for (auto& statement : function_body->commands) {
+					auto return_level = excute_statement(statement);
+					if (return_level != 0) {
+						if (result != nullptr && return_level == 1) {
+							*result = (scope_stack.back().identifiers.find("&") != scope_stack.back().identifiers.end()) ? scope_stack.back().identifiers.at("&") : CommandValue{ CommandValue::Type::Empty, std::monostate{} };
+						}
+						scope_stack.pop_back();
+						return return_level - 1;
+					}
+				}
+				if (result != nullptr) {
+					*result = (scope_stack.back().identifiers.find("&") != scope_stack.back().identifiers.end()) ? scope_stack.back().identifiers.at("&") : CommandValue{ CommandValue::Type::Empty, std::monostate{} };
+				}
+				scope_stack.pop_back();
+				return 0;
+			};
+			*result = CommandValue{ CommandValue::Type::Function, function };
+			return 0;
+		}
+
+		auto excute_assignment(const CommandASTAssignmentNode& assignment, CommandValue* result) -> uint32_t {
+			auto [identifier, is_protected] = find_identifier_or_insert(assignment.name);
+			if (is_protected) {
 				throw CommandException("`{}` is protected, cannot assign to this name.", assignment.name);
 			}
-			for (auto scope = scope_stack.rbegin(); scope != scope_stack.rend(); ++scope) {
-				if (scope->find(assignment.name) != scope->end()) {
-					scope->at(assignment.name) = excute_expression(assignment.expression);
-					return;
-				}
+			auto return_level = excute_expression(*(assignment.expression), &identifier);
+			if (return_level != 0) {
+				return return_level;
 			}
-
-			// !!!!!!!!!!!!!!!!!!!!!!!!!!!! LOOK HERE MYSELF !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			// scope_stack.rbegin()->insert({ assignment.name, excute_expression(assignment.expression) });
-			// ^ Explain: Why this line causes leak?
-			// It first takes a iterator rbegin(),
-			// but in the excute_expression() function, it is possible that something will be pushed into the scope_stack,
-			// scope_stack is a std::vector which may reallocate the memory,
-			// which will cause the rbegin() iterator to be invalidated.
-			// And the iterator will be used in the insert() function, which will cause memory leak.
-			// So, we must break up this like to make the `excute_expression()` excuted prior to the `rbegin()`
-			// Like below:
-			auto result = excute_expression(assignment.expression);
-			scope_stack.rbegin()->insert({ assignment.name, std::move(result) });
+			if (result != nullptr) {
+				*result = identifier;
+			}
+			return 0;
 		}
 
-		auto excute_argument(const CommandASTArgumentNode& argument) -> void {
-			if (scope_wide_protected.contains(argument.name)) {
-				throw CommandException("`{}` is protected, cannot assign to this name.", argument.name);
+		auto excute_protection(const CommandASTProtectionNode& protection, CommandValue* result) -> uint32_t {
+			find_identifier_or_throw(protection.name);
+			scope_stack.back().protections.insert(protection.name);
+			return 0;
+		}
+
+		auto excute_delete(const CommandASTDeleteNode& deletion, CommandValue* result) -> uint32_t {
+			for (auto it = scope_stack.rbegin(); it != scope_stack.rend(); ++it) {
+				if (it->protections.find(deletion.name) != it->protections.end()) {
+					throw CommandException("`{}` is protected, cannot delete it.", deletion.name);
+				}
+				auto find = it->identifiers.find(deletion.name);
+				if (find != it->identifiers.end()) {
+					it->identifiers.erase(find);
+					return 0;
+				}
 			}
+			throw CommandException("Cannot delete a non-exist identifier {}.", deletion.name);
+		}
+
+		auto excute_argument(const CommandASTArgumentNode& argument, CommandValue* result) -> uint32_t {
 			if (argument.length > scope_stack.size()) {
-				throw CommandException("Scope doesn't exist.");
+				throw CommandException("Scope doesn't exist");
 			}
-
 			auto skip = argument.length - 1;
+			if (scope_stack.rbegin()[skip].identifiers.find("@") == scope_stack.rbegin()[skip].identifiers.end()) {
+				excute_return(CommandASTReturnNode::make(
+					argument.length, 
+					std::make_unique<CommandASTExpressionNode>(CommandASTExpressionNode::make_empty())
+				), result);
+			}
+			if (scope_stack.rbegin()[skip].identifiers.at("@").type != CommandValue::Type::List) {
+				throw CommandException("Unexpected Kernel Error. Argument is not or is not converted to a list.");
+			}
 
-			if (scope_stack.rbegin()[skip].find("@") == scope_stack.rbegin()[skip].end()) {
-				throw CommandException("Fetching more arguments that provided.");
-			}
-			if (scope_stack.rbegin()[skip].at("@").type != CommandValue::Type::List) {
-				throw CommandException("Fetching more arguments that provided.");
-			}
-			auto& i_v = scope_stack.rbegin()[skip].at("@i");
+			auto& i_v = scope_stack.rbegin()[skip].identifiers.at("@i");
 			size_t i = std::llround(std::get<float>(i_v.value));
-			auto& arguments = std::get<std::vector<CommandValue>>(scope_stack.rbegin()[skip].at("@").value);
+			auto& arguments = std::get<std::vector<CommandValue>>(scope_stack.rbegin()[skip].identifiers.at("@").value);
 			if (i >= arguments.size()) {
-				throw CommandException("Fetching more arguments that provided.");
+				excute_return(CommandASTReturnNode::make(
+					argument.length,
+					std::make_unique<CommandASTExpressionNode>(CommandASTExpressionNode::make_empty())
+				), result);
 			}
 			i_v.value = float(i + 1);
-			auto& value = arguments[i];
-
-			for (auto scope = scope_stack.rbegin(); scope != scope_stack.rend(); ++scope) {
-				if (scope->find(argument.name) != scope->end()) {
-					scope->at(argument.name) = value;
-					return;
-				}
+			if (result != nullptr) {
+				*result = arguments[i];
 			}
-			scope_stack.rbegin()->insert({ argument.name, value });
+			return 0;
 		}
 
-		auto excute_return(const CommandASTReturnNode& returning) -> void {
+		auto excute_return(const CommandASTReturnNode& returning, CommandValue* result) -> uint32_t {
 			if (returning.length > scope_stack.size()) {
 				throw CommandException("Scope doesn't exist.");
 			}
-
 			auto skip = returning.length - 1;
 
-			if (skip != 0) {
-				throw CommandException("Multiple return is not supported yet.");
+			CommandValue return_value;
+			auto return_level = excute_expression(*(returning.expression), &return_value);
+			if (return_level != 0) {
+				return return_level;
 			}
-
-			scope_stack.rbegin()[skip].insert({ "&", excute_expression(returning.expression) });
-		}
-
-		auto excute_delete(const CommandASTDeleteNode& deletion) -> void {
-			if (scope_wide_protected.contains(deletion.name)) {
-				throw CommandException("`{}` is protected, cannot delete this name.", deletion.name);
-			}
-			for (auto scope = scope_stack.rbegin(); scope != scope_stack.rend(); ++scope) {
-				if (scope->find(deletion.name) != scope->end()) {
-					scope->erase(deletion.name);
-					return;
-				}
-			}
+			scope_stack.rbegin()[skip].identifiers.insert({ "&", std::move(return_value) });
+			return returning.length;
 		}
 
 		CommandKernel() {
