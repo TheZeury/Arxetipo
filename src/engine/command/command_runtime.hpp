@@ -14,25 +14,13 @@ namespace arx
 		bool exit = false;
 
 		CommandRuntime(std::istream& input, std::ostream& output, std::ostream& error = std::cerr) : input{ input }, output{ output }, error{ error }, kernel{}, parser{ kernel }, lexer{ parser } {
-			kernel.add_function("print", [&](const std::vector<CommandValue>& arguments, CommandValue* result) -> uint32_t {
-				for (const auto& argument : arguments) {
-					output << argument.to_string() << std::endl;
-				}
-				if (result != nullptr) {
-					*result = CommandValue{ CommandValue::Type::Empty, std::monostate{} };
-				}
-				return 0;
-			}, true);
-			kernel.add_function("exit", [&](const std::vector<CommandValue>& arguments, CommandValue* result) -> uint32_t {
-				exit = true;
-				if (result != nullptr) {
-					*result = CommandValue{ CommandValue::Type::Empty, std::monostate{} };
-				}
-				return 0;
-			}, true);
 		}
 
-		auto run() -> void {
+		auto load_library(CommandLibrary&& library) -> void {
+			library.load_to(kernel);
+		}
+
+		auto run() -> int {
 			while (!exit) {
 				output.flush();
 				std::string line;
@@ -42,6 +30,7 @@ namespace arx
 				}
 				run_code(line);
 			}
+			return 0;
 		}
 
 		auto run_code(const std::string& code) -> void {

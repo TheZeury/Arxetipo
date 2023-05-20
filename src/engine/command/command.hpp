@@ -18,8 +18,15 @@ namespace arx
 {
 	struct CommandException : public std::exception
 	{
+		CommandException(const std::string& message) : message{ message } {
+		}
+
 		template<typename... Args>
 		CommandException(const std::format_string<Args...> message, Args&... args) : message{ std::format<Args...>(message, std::forward<Args>(args)...) } {
+		}
+
+		template<typename... Args>
+		CommandException(const std::format_string<Args...> message, Args&&... args) : message{ std::format<Args...>(message, std::forward<Args>(args)...) } {
 		}
 
 		const char* what() const noexcept override {
@@ -36,5 +43,6 @@ namespace arx
 #include "command_kernel.hpp"
 #include "command_reader.hpp"
 #include "command_parser.hpp"
+#include "command_library.hpp"
 #include "command_ast_printer.hpp"
 #include "command_runtime.hpp"

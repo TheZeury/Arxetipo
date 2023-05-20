@@ -11,10 +11,11 @@ namespace arx
 			String,
 			List,
 			Function,
+			Macro,
 		};
 		Type type;
 		std::variant<
-			std::monostate, 
+			bool, 
 			float, 
 			std::string, 
 			std::vector<CommandValue>, 
@@ -24,19 +25,19 @@ namespace arx
 		CommandValue(
 			Type type = Type::Empty, 
 			std::variant<
-				std::monostate,
+				bool,
 				float,
 				std::string,
 				std::vector<CommandValue>,
 				std::function<uint32_t(const std::vector<CommandValue>&, CommandValue*)>
-			> value = std::monostate{ }
+			> value = true
 		) : type{ type }, value{ value } {
 		}
 
 		auto to_string() const -> std::string {
 			switch (type) {
 			case Type::Empty: {
-				return "()";
+				return std::get<bool>(value) ? "()" : "(-)";
 			}
 			case Type::Number: {
 				return std::to_string(std::get<float>(value));
@@ -59,6 +60,9 @@ namespace arx
 			case Type::Function: {
 				return "function";
 			}
+			case Type::Macro: {
+				return "marco";
+			}
 			default: {
 				return "unknown";
 			}
@@ -70,10 +74,13 @@ namespace arx
 		}
 
 		auto operator-() const -> CommandValue {
-			if (type == Type::Number) {
+			if (type == Type::Empty) {
+				return CommandValue{ Type::Empty, !std::get<bool>(value) };
+			}
+			else if (type == Type::Number) {
 				return CommandValue{ Type::Number, -std::get<float>(value) };
 			}
-			return CommandValue{ Type::Empty, std::monostate{} };
+			return CommandValue{ Type::Empty, false };
 		}
 
 		auto operator+(const CommandValue& other) const -> CommandValue {
@@ -83,47 +90,169 @@ namespace arx
 			if (other.type == Type::Empty) {
 				return *this;
 			}
-			if (type == Type::String || other.type == Type::String) {
-				return CommandValue{ Type::String, to_string() + other.to_string() };
-			}
 			if (type == Type::Number && other.type == Type::Number) {
 				return CommandValue{ Type::Number, std::get<float>(value) + std::get<float>(other.value) };
 			}
-			if (type == Type::List && other.type == Type::List) {
+			if (type == Type::List) {
 				auto result = std::get<std::vector<CommandValue>>(value);
-				result.insert(result.end(), std::get<std::vector<CommandValue>>(other.value).begin(), std::get<std::vector<CommandValue>>(other.value).end());
-				return CommandValue{ Type::List, result };
+				if (other.type == Type::List) {
+					result.insert(result.end(), std::get<std::vector<CommandValue>>(other.value).begin(), std::get<std::vector<CommandValue>>(other.value).end());
+				}
+				else {
+					result.push_back(other);
+				}
+				return CommandValue{ Type::List, std::move(result) };
 			}
-			return CommandValue{ Type::Empty, std::monostate{} };
+			if (type == Type::String || other.type == Type::String) {
+				return CommandValue{ Type::String, to_string() + other.to_string() };
+			}
+			return CommandValue{ Type::Empty, false };
 		}
 
 		auto operator-(const CommandValue& other) const -> CommandValue {
-			if (type == Type::Empty) {
+			if (type == Type::Empty || other.type == Type::Empty) {
 				return -other;
-			}
-			if (other.type == Type::Empty) {
-				return *this;
 			}
 			if (type == Type::Number && other.type == Type::Number) {
 				return CommandValue{ Type::Number, std::get<float>(value) - std::get<float>(other.value) };
 			}
-			return CommandValue{ Type::Empty, std::monostate{ } };
+			return CommandValue{ Type::Empty, false };
 		}
 
 		auto operator*(const CommandValue& other) const -> CommandValue {
+			if (type == Type::Empty && other.type == Type::Empty) {
+				return CommandValue(Type::Empty, std::get<bool>(value) == std::get<bool>(other.value));
+			}
 			if (type == Type::Number && other.type == Type::Number) {
 				return CommandValue{ Type::Number, std::get<float>(value) * std::get<float>(other.value) };
 			}
-			return CommandValue{ Type::Empty, std::monostate{ } };
+			if (type == Type::Empty && other.type == Type::Number) {
+				return CommandValue{ Type::Number, std::get<bool>(value) ? std::get<float>(other.value) : -std::get<float>(other.value) };
+			}
+			if (type == Type::Number && other.type == Type::Empty) {
+				return CommandValue{ Type::Number, std::get<bool>(other.value) ? std::get<float>(value) : -std::get<float>(value) };
+			}
+			return CommandValue{ Type::Empty, false };
 		}
 
 		auto operator/(const CommandValue& other) const -> CommandValue {
 			if (type == Type::Number && other.type == Type::Number) {
 				return CommandValue{ Type::Number, std::get<float>(value) / std::get<float>(other.value) };
 			}
-			return CommandValue{ Type::Empty, std::monostate{ } };
+			return CommandValue{ Type::Empty, false };
+		}
+
+		auto operator%(const CommandValue& other) const -> CommandValue {
+			if (type == Type::Number && other.type == Type::Number) {
+				return CommandValue{ Type::Number, std::fmod(std::get<float>(value), std::get<float>(other.value)) };
+			}
+			return CommandValue{ Type::Empty, true };
+		}
+
+		auto operator==(const CommandValue& other) const -> CommandValue {
+			if (type == Type::Empty && other.type == Type::Empty) {
+				return CommandValue{ Type::Empty, std::get<bool>(value) == std::get<bool>(other.value) };
+			}
+			if (type == Type::Number && other.type == Type::Number) {
+				return CommandValue{ Type::Empty, std::get<float>(value) == std::get<float>(other.value) };
+			}
+			if (type == Type::String && other.type == Type::String) {
+				return CommandValue{ Type::Empty, std::get<std::string>(value) == std::get<std::string>(other.value) };
+			}
+			return CommandValue{ Type::Empty, false };
+		}
+
+		auto operator!=(const CommandValue& other) const -> CommandValue {
+			auto result = *this == other;
+			std::get<bool>(result.value) = !std::get<bool>(result.value);
+			return result;
+		}
+
+		auto operator<(const CommandValue& other) const -> CommandValue {
+			if (type == Type::Empty && other.type == Type::Empty) {
+				return CommandValue{ Type::Empty, std::get<bool>(value) < std::get<bool>(other.value) };
+			}
+			if (type == Type::Number && other.type == Type::Number) {
+				return CommandValue{ Type::Empty, std::get<float>(value) < std::get<float>(other.value) };
+			}
+			if (type == Type::String && other.type == Type::String) {
+				return CommandValue{ Type::Empty, std::get<std::string>(value) < std::get<std::string>(other.value) };
+			}
+			return CommandValue{ Type::Empty, false };
+		}
+
+		auto operator<=(const CommandValue& other) const -> CommandValue {
+			if (type == Type::Empty && other.type == Type::Empty) {
+				return CommandValue{ Type::Empty, std::get<bool>(value) <= std::get<bool>(other.value) };
+			}
+			if (type == Type::Number && other.type == Type::Number) {
+				return CommandValue{ Type::Empty, std::get<float>(value) <= std::get<float>(other.value) };
+			}
+			if (type == Type::String && other.type == Type::String) {
+				return CommandValue{ Type::Empty, std::get<std::string>(value) <= std::get<std::string>(other.value) };
+			}
+			return CommandValue{ Type::Empty, false };
+		}
+
+		auto operator>(const CommandValue& other) const -> CommandValue {
+			if (type == Type::Empty && other.type == Type::Empty) {
+				return CommandValue{ Type::Empty, std::get<bool>(value) > std::get<bool>(other.value) };
+			}
+			if (type == Type::Number && other.type == Type::Number) {
+				return CommandValue{ Type::Empty, std::get<float>(value) > std::get<float>(other.value) };
+			}
+			if (type == Type::String && other.type == Type::String) {
+				return CommandValue{ Type::Empty, std::get<std::string>(value) > std::get<std::string>(other.value) };
+			}
+			return CommandValue{ Type::Empty, false };
+		}
+
+		auto operator>=(const CommandValue& other) const -> CommandValue {
+			if (type == Type::Empty && other.type == Type::Empty) {
+				return CommandValue{ Type::Empty, std::get<bool>(value) >= std::get<bool>(other.value) };
+			}
+			if (type == Type::Number && other.type == Type::Number) {
+				return CommandValue{ Type::Empty, std::get<float>(value) >= std::get<float>(other.value) };
+			}
+			if (type == Type::String && other.type == Type::String) {
+				return CommandValue{ Type::Empty, std::get<std::string>(value) >= std::get<std::string>(other.value) };
+			}
+			return CommandValue{ Type::Empty, false };
+		}
+
+		auto operator!() const -> CommandValue {
+			if (type == Type::Empty) {
+				return CommandValue{ Type::Empty, !std::get<bool>(value) };
+			}
+			return CommandValue{ Type::Empty, false };
 		}
 	};
+
+	inline auto to_string(const CommandValue::Type& type) -> std::string {
+		switch (type) {
+		case CommandValue::Type::Empty: {
+			return "Empty";
+		}
+		case CommandValue::Type::Number: {
+			return "Number";
+		}
+		case CommandValue::Type::String: {
+			return "String";
+		}
+		case CommandValue::Type::List: {
+			return "List";
+		}
+		case CommandValue::Type::Function: {
+			return "Function";
+		}
+		case CommandValue::Type::Macro: {
+			return "Marco";
+		}
+		default: {
+			return "Unknown";
+		}
+		}
+	}
 
 	struct CommandKernel
 	{
@@ -131,7 +260,35 @@ namespace arx
 			std::unordered_map<std::string, CommandValue> identifiers;
 			std::unordered_set<std::string> protections;
 		};
+		struct BodyFrame {
+			std::shared_ptr<std::vector<CommandValue>> owned_arguments;
+			const std::vector<CommandValue>* arguments;
+			size_t index = 0;
+			CommandValue return_value;
+			const std::function<uint32_t(const std::vector<CommandValue>&, CommandValue*)>* self;
+			BodyFrame(
+				const std::vector<CommandValue>* arguments, 
+				const std::function<uint32_t(const std::vector<CommandValue>&, CommandValue*)>* self
+			) : 
+				arguments{ arguments },
+				return_value{ },
+				self{ self } {
+			}
+		};
 		std::vector<StackFrame> scope_stack{ 1 };
+		std::vector<BodyFrame> body_stack;
+		bool requiring_loop = false;
+
+		auto add_identifier(const std::string& name, CommandValue&& value, bool protect = false) -> bool {
+			if (scope_stack.back().protections.contains(name)) {
+				return false;
+			}
+			scope_stack.back().identifiers[name] = std::move(value);
+			if (protect) {
+				scope_stack.back().protections.insert(name);
+			}
+			return true;
+		}
 
 		auto add_function(const std::string& name, const std::function<uint32_t(const std::vector<CommandValue>&, CommandValue*)>& function, bool protect = false) -> CommandKernel& {
 			scope_stack.rbegin()->identifiers.insert({ name, CommandValue{ CommandValue::Type::Function, function } });
@@ -150,7 +307,7 @@ namespace arx
 		}
 
 		auto add_empty(const std::string& name, bool protect = false) -> CommandKernel& {
-			scope_stack.rbegin()->insert({ name, CommandValue{ CommandValue::Type::Empty, std::monostate{ } } });
+			scope_stack.rbegin()->insert({ name, CommandValue{ CommandValue::Type::Empty, true } });
 			if (protect) {
 				scope_wide_protected.insert(name); 
 			}
@@ -168,7 +325,7 @@ namespace arx
 					return { find->second, is_protected };
 				}
 			}
-			scope_stack.rbegin()->identifiers.insert({ name, CommandValue{ CommandValue::Type::Empty, std::monostate{ } } });
+			scope_stack.rbegin()->identifiers.insert({ name, CommandValue{ CommandValue::Type::Empty, true } });
 			return { scope_stack.rbegin()->identifiers.at(name), false }; // false, not `is_protected`. 
 		}
 		
@@ -205,11 +362,12 @@ namespace arx
 			}
 		}
 
+	public: // excute expressions.
 		auto excute_expression(const CommandASTExpressionNode& expression, CommandValue* result) -> uint32_t {
 			switch (expression.type) {
 			case CommandASTExpressionNode::Type::Empty: {
 				if (result != nullptr) {
-					*result = CommandValue{ CommandValue::Type::Empty, std::monostate{ } };
+					*result = CommandValue{ CommandValue::Type::Empty, true };
 				}
 				return 0;
 			}
@@ -237,11 +395,14 @@ namespace arx
 			case CommandASTExpressionNode::Type::Parentheses: {
 				return excute_expression(*(std::get<CommandASTParenthesesNode>(expression.value).expression), result);
 			}
-			case CommandASTExpressionNode::Type::FunctionCall: {
-				return excute_function_call(std::get<CommandASTFunctionCallNode>(expression.value), result);
+			case CommandASTExpressionNode::Type::Calling: {
+				return excute_calling(std::get<CommandASTCallingNode>(expression.value), result);
 			}
 			case CommandASTExpressionNode::Type::FunctionBody: {
 				return excute_function_body(std::get<CommandASTFunctionBodyNode>(expression.value), result);
+			}
+			case CommandASTExpressionNode::Type::Condition: {
+				return excute_condition(std::get<CommandASTConditionNode>(expression.value), result);
 			}
 			case CommandASTExpressionNode::Type::Assignment: {
 				return excute_assignment(std::get<CommandASTAssignmentNode>(expression.value), result);
@@ -257,6 +418,15 @@ namespace arx
 			}
 			case CommandASTExpressionNode::Type::Return: {
 				return excute_return(std::get<CommandASTReturnNode>(expression.value), result);
+			}
+			case CommandASTExpressionNode::Type::Self: {
+				return excute_self(std::get<CommandASTSelfNode>(expression.value), result);
+			}
+			case CommandASTExpressionNode::Type::Loop: {
+				return excute_loop(std::get<CommandASTLoopNode>(expression.value), result);
+			}
+			case CommandASTExpressionNode::Type::Accessing: {
+				return excute_accessing(std::get<CommandASTAccessingNode>(expression.value), result);
 			}
 			default: {
 				throw CommandException("Unexcutable expression type.");
@@ -275,7 +445,7 @@ namespace arx
 			}
 			scope_stack.rbegin()->identifiers.insert({
 				identifier.name,
-				CommandValue{ CommandValue::Type::Empty, std::monostate{ } }
+				CommandValue{ CommandValue::Type::Empty, true }
 			});
 			if (result != nullptr) {
 				*result = scope_stack.rbegin()->identifiers.at(identifier.name);
@@ -319,6 +489,50 @@ namespace arx
 					*result = -operand_results[0];
 					break;
 				}
+				case CommandASTOperationNode::Type::Not: {
+					*result = !operand_results[0];
+					break;
+				}
+				case CommandASTOperationNode::Type::Modulo: {
+					*result = operand_results[0] % operand_results[1];
+					break;
+				}
+				case CommandASTOperationNode::Type::Exponent: {
+					if (operand_results[0].type == CommandValue::Type::Number && operand_results[1].type == CommandValue::Type::Number) {
+						*result = CommandValue{ 
+							CommandValue::Type::Number, 
+							std::pow(std::get<float>(operand_results[0].value), std::get<float>(operand_results[1].value)) 
+						};
+					}
+					else {
+						*result = CommandValue{ CommandValue::Type::Empty, true };
+					}
+					break;
+				}
+				case CommandASTOperationNode::Type::Equal: {
+					*result = operand_results[0] == operand_results[1];
+					break;
+				}
+				case CommandASTOperationNode::Type::NotEqual: {
+					*result = operand_results[0] != operand_results[1];
+					break;
+				}
+				case CommandASTOperationNode::Type::LessThan: {
+					*result = operand_results[0] < operand_results[1];
+					break;
+				}
+				case CommandASTOperationNode::Type::LessThanOrEqual: {
+					*result = operand_results[0] <= operand_results[1];
+					break;
+				}
+				case CommandASTOperationNode::Type::GreaterThan: {
+					*result = operand_results[0] > operand_results[1];
+					break;
+				}
+				case CommandASTOperationNode::Type::GreaterThanOrEqual: {
+					*result = operand_results[0] >= operand_results[1];
+					break;
+				}
 				default:
 					throw CommandException("Unknow operation.");
 				}
@@ -349,29 +563,61 @@ namespace arx
 			return 0;
 		}
 
-		auto excute_function_call(const CommandASTFunctionCallNode& function_call, CommandValue* result) -> uint32_t {
-			CommandValue function;
-			auto return_level = excute_expression(*(function_call.function_body), &function);
+		auto excute_calling(const CommandASTCallingNode& calling, CommandValue* result) -> uint32_t {
+			CommandValue callable;
+			auto return_level = excute_expression(*(calling.callable), &callable);
 			if (return_level != 0) {
 				return return_level;
-			}
-
-			if (function.type != CommandValue::Type::Function) {
-				throw CommandException("Trying to call a non-function.");
 			}
 
 			CommandValue argument;
-			return_level = excute_expression(*(function_call.argument), &argument);
+			return_level = excute_expression(*(calling.argument), &argument);
 			if (return_level != 0) {
 				return return_level;
 			}
 
-			if (argument.type == CommandValue::Type::List) {
-				const auto& arguments = std::get<std::vector<CommandValue>>(argument.value);
-				return std::get<std::function<uint32_t(const std::vector<CommandValue>&, CommandValue*)>>(function.value)(arguments, result);
+			switch (callable.type)
+			{
+			case CommandValue::Type::Function: {
+				if (scope_stack.size() >= 1000) {
+					throw CommandException("Stack overflow.");
+				}
+				scope_stack.push_back({ });
+
+				auto& function = std::get<std::function<uint32_t(const std::vector<CommandValue>&, CommandValue*)>>(callable.value);
+				function(argument.type == CommandValue::Type::List ? std::get<std::vector<CommandValue>>(argument.value) : std::vector{ argument }, result);
+
+				scope_stack.pop_back();
+
+				break;
 			}
-			else {
-				return std::get<std::function<uint32_t(const std::vector<CommandValue>&, CommandValue*)>>(function.value)({ argument }, result);
+			case CommandValue::Type::Macro: {
+				auto& function = std::get<std::function<uint32_t(const std::vector<CommandValue>&, CommandValue*)>>(callable.value);
+				function(argument.type == CommandValue::Type::List ? std::get<std::vector<CommandValue>>(argument.value) : std::vector{ argument }, result);
+				break;
+			}
+			case CommandValue::Type::List: {
+				auto& list = std::get<std::vector<CommandValue>>(callable.value);
+				if (argument.type == CommandValue::Type::Number) {
+					auto index = std::llround(std::get<float>(argument.value));
+					if ((index < -static_cast<int64_t>(list.size())) || (index >= static_cast<int64_t>(list.size()))) {
+						throw CommandException("Index({}) out of range(-{}..{}).", index, list.size(), list.size());
+					}
+					if (index < 0) {
+						index += list.size();
+					}
+					if (result != nullptr) {
+						*result = list[index];
+					}
+				}
+				else {
+					throw CommandException("Index must be a number.");
+				}
+				break;
+			}
+			default: {
+				throw CommandException("{} is not callable.", to_string(callable.type));
+			}
 			}
 			return 0;
 		}
@@ -383,103 +629,180 @@ namespace arx
 			if (result == nullptr) {
 				return 0;
 			}
-			std::shared_ptr<CommandASTFunctionBodyNode> function_body = std::make_shared<CommandASTFunctionBodyNode>(body.clone());
-			auto function = [&, function_body](const std::vector<CommandValue>& arguments, CommandValue* result) -> uint32_t {
-				if (scope_stack.size() >= 1000) {
-					throw CommandException("Stack overflow.");
-				}
-				scope_stack.push_back({ });
-				scope_stack.back().identifiers.insert({ "@", CommandValue{ CommandValue::Type::List, arguments } });
-				scope_stack.back().identifiers.insert({ "@i", CommandValue{ CommandValue::Type::Number, 0.f } });
-				for (auto& statement : function_body->commands) {
-					auto return_level = excute_statement(statement);
-					if (return_level != 0) {
-						if (result != nullptr && return_level == 1) {
-							*result = (scope_stack.back().identifiers.find("&") != scope_stack.back().identifiers.end()) ? scope_stack.back().identifiers.at("&") : CommandValue{ CommandValue::Type::Empty, std::monostate{} };
+
+			struct body_callable {
+				std::shared_ptr<CommandASTFunctionBodyNode> body;
+				CommandKernel& kernel;
+				auto operator()(const std::vector<CommandValue>& arguments, CommandValue* result) const -> uint32_t {
+					std::function<uint32_t(const std::vector<CommandValue>&, CommandValue*)> self = *this;
+					kernel.body_stack.emplace_back(
+						&arguments,
+						&self
+					);
+					while (true) {
+						for (auto& statement : body->commands) {
+							auto return_level = kernel.excute_statement(statement);
+							if (return_level == 0) {
+								continue;
+							}
+							else if (return_level == 1) {
+								if (kernel.requiring_loop) {
+									break;
+								}
+								else if (result != nullptr) {
+									*result = kernel.body_stack.back().return_value;
+								}
+							}
+							kernel.body_stack.pop_back();
+							return return_level - 1;
 						}
-						scope_stack.pop_back();
-						return return_level - 1;
+						if (kernel.requiring_loop) {
+							kernel.requiring_loop = false;
+							continue;
+						}
+						break;
 					}
+					if (result != nullptr) {
+						*result = kernel.body_stack.back().return_value;
+					}
+					kernel.body_stack.pop_back();
+					return 0;
 				}
-				if (result != nullptr) {
-					*result = (scope_stack.back().identifiers.find("&") != scope_stack.back().identifiers.end()) ? scope_stack.back().identifiers.at("&") : CommandValue{ CommandValue::Type::Empty, std::monostate{} };
+				body_callable(std::shared_ptr<CommandASTFunctionBodyNode> body, CommandKernel& kernel) : body(body), kernel(kernel) { }
+				body_callable(const body_callable& other) : body(other.body), kernel(other.kernel) { }
+				body_callable(body_callable&& other) : body(std::move(other.body)), kernel(other.kernel) { }
+				auto operator=(const body_callable& other) -> body_callable& {
+					body = other.body;
+					kernel = other.kernel;
+					return *this;
 				}
-				scope_stack.pop_back();
-				return 0;
+				auto operator=(body_callable&& other) -> body_callable& {
+					body = std::move(other.body);
+					kernel = other.kernel;
+					return *this;
+				}
 			};
-			*result = CommandValue{ CommandValue::Type::Function, function };
+
+			std::function<uint32_t(const std::vector<CommandValue>&, CommandValue*)> function = 
+				body_callable(std::make_shared<CommandASTFunctionBodyNode>(body.clone()), *this);
+			*result = CommandValue{ CommandValue::Type::Function, std::move(function) };
 			return 0;
 		}
 
+		auto excute_condition(const CommandASTConditionNode& condition, CommandValue* result) -> uint32_t {
+			CommandValue condition_result;
+			if (condition.condition != nullptr) {
+				auto return_level = excute_expression(*(condition.condition), &condition_result);
+				if (return_level != 0) {
+					return return_level;
+				}
+			}
+			if ((condition_result.type == CommandValue::Type::Empty) && (!std::get<bool>(condition_result.value))) {
+				if (condition.false_branch != nullptr) {
+					return excute_expression(*(condition.false_branch), result);
+				}
+				else {
+					return 0;
+				}
+			}
+			else {
+				if (condition.true_branch != nullptr) {
+					return excute_expression(*(condition.true_branch), result);
+				}
+				else {
+					return 0;
+				}
+			}
+		}
+
 		auto excute_assignment(const CommandASTAssignmentNode& assignment, CommandValue* result) -> uint32_t {
-			auto [identifier, is_protected] = find_identifier_or_insert(assignment.name);
-			if (is_protected) {
-				throw CommandException("`{}` is protected, cannot assign to this name.", assignment.name);
+			if (assignment.local) {
+				auto name = get_identifier(*(assignment.target));
+				if (scope_stack.back().identifiers.find(name) == scope_stack.back().identifiers.end()) {
+					scope_stack.back().identifiers.insert({ name, CommandValue{ CommandValue::Type::Empty, true } });
+				}
+				else {
+					if (scope_stack.back().protections.contains(name)) {
+						throw CommandException("cannot assign to protected identifier `{}`.", name);
+					}
+				}
+				auto& identifier = scope_stack.back().identifiers.at(name);
+
+				auto return_level = excute_expression(*(assignment.expression), &identifier);
+				if (return_level != 0) {
+					return return_level;
+				}
+				if (result != nullptr) {
+					*result = identifier;
+				}
 			}
-			auto return_level = excute_expression(*(assignment.expression), &identifier);
-			if (return_level != 0) {
-				return return_level;
+			else {
+				auto [identifier, is_protected] = get_assignable(*(assignment.target));
+				if (is_protected) {
+					throw CommandException("cannot assign to protected identifier.");
+				}
+				auto return_level = excute_expression(*(assignment.expression), &identifier);
+				if (return_level != 0) {
+					return return_level;
+				}
+				if (result != nullptr) {
+					*result = identifier;
+				}
 			}
+			return 0;
+		}
+
+		auto excute_protection(const CommandASTProtectionNode& protection, CommandValue* result) -> uint32_t {
+			auto name = get_identifier(*(protection.target));
+			auto [identifier, _] = find_identifier_or_throw(name);
+			scope_stack.back().protections.insert(name);
 			if (result != nullptr) {
 				*result = identifier;
 			}
 			return 0;
 		}
 
-		auto excute_protection(const CommandASTProtectionNode& protection, CommandValue* result) -> uint32_t {
-			find_identifier_or_throw(protection.name);
-			scope_stack.back().protections.insert(protection.name);
-			return 0;
-		}
-
 		auto excute_delete(const CommandASTDeleteNode& deletion, CommandValue* result) -> uint32_t {
+			auto name = get_identifier(*(deletion.target));
 			for (auto it = scope_stack.rbegin(); it != scope_stack.rend(); ++it) {
-				if (it->protections.find(deletion.name) != it->protections.end()) {
-					throw CommandException("`{}` is protected, cannot delete it.", deletion.name);
+				if (it->protections.find(name) != it->protections.end()) {
+					throw CommandException("`{}` is protected, cannot delete it.", name);
 				}
-				auto find = it->identifiers.find(deletion.name);
+				auto find = it->identifiers.find(name);
 				if (find != it->identifiers.end()) {
+					if (result != nullptr) {
+						*result = find->second;
+					}
 					it->identifiers.erase(find);
 					return 0;
 				}
 			}
-			throw CommandException("Cannot delete a non-exist identifier {}.", deletion.name);
+			throw CommandException("Cannot delete a non-existing identifier {}.", name);
 		}
 
 		auto excute_argument(const CommandASTArgumentNode& argument, CommandValue* result) -> uint32_t {
-			if (argument.length > scope_stack.size()) {
-				throw CommandException("Scope doesn't exist");
+			if (argument.length > body_stack.size()) {
+				throw CommandException("Body doesn't exist");
 			}
 			auto skip = argument.length - 1;
-			if (scope_stack.rbegin()[skip].identifiers.find("@") == scope_stack.rbegin()[skip].identifiers.end()) {
-				excute_return(CommandASTReturnNode::make(
+			auto& target_stack = body_stack.rbegin()[skip];
+			if (target_stack.index >= target_stack.arguments->size()) {
+				return excute_return(CommandASTReturnNode::make(
 					argument.length, 
 					std::make_unique<CommandASTExpressionNode>(CommandASTExpressionNode::make_empty())
 				), result);
 			}
-			if (scope_stack.rbegin()[skip].identifiers.at("@").type != CommandValue::Type::List) {
-				throw CommandException("Unexpected Kernel Error. Argument is not or is not converted to a list.");
-			}
 
-			auto& i_v = scope_stack.rbegin()[skip].identifiers.at("@i");
-			size_t i = std::llround(std::get<float>(i_v.value));
-			auto& arguments = std::get<std::vector<CommandValue>>(scope_stack.rbegin()[skip].identifiers.at("@").value);
-			if (i >= arguments.size()) {
-				excute_return(CommandASTReturnNode::make(
-					argument.length,
-					std::make_unique<CommandASTExpressionNode>(CommandASTExpressionNode::make_empty())
-				), result);
-			}
-			i_v.value = float(i + 1);
 			if (result != nullptr) {
-				*result = arguments[i];
+				*result = (*target_stack.arguments)[target_stack.index];
 			}
+			++target_stack.index;
 			return 0;
 		}
 
 		auto excute_return(const CommandASTReturnNode& returning, CommandValue* result) -> uint32_t {
-			if (returning.length > scope_stack.size()) {
-				throw CommandException("Scope doesn't exist.");
+			if (returning.length > body_stack.size()) {
+				throw CommandException("Body doesn't exist.");
 			}
 			auto skip = returning.length - 1;
 
@@ -488,12 +811,255 @@ namespace arx
 			if (return_level != 0) {
 				return return_level;
 			}
-			scope_stack.rbegin()[skip].identifiers.insert({ "&", std::move(return_value) });
+			body_stack.rbegin()[skip].return_value = std::move(return_value);
 			return returning.length;
+		}
+
+		auto excute_accessing(const CommandASTAccessingNode& accessing, CommandValue* result) -> uint32_t {
+			CommandValue value;
+			auto return_level = excute_expression(*(accessing.expression), &value);
+			if (return_level != 0) {
+				return return_level;
+			}
+			switch (value.type)
+			{
+			case CommandValue::Type::String: {
+				return excute_identifier(CommandASTIdentifierNode::make(std::get<std::string>(value.value)), result);
+			}
+			case CommandValue::Type::Function: {
+				if (result != nullptr) {
+					*result = CommandValue{ CommandValue::Type::Macro, value.value };
+				}
+				return 0;
+			}
+			default:
+				throw CommandException("{} value type is not accessible.", to_string(value.type));
+				break;
+			}
+		}
+
+		auto excute_self(const CommandASTSelfNode& self, CommandValue* result) -> uint32_t {
+			if (result != nullptr) {
+				if (self.length > body_stack.size()) {
+					throw CommandException("Body doesn't exist.");
+				}
+				auto skip = self.length - 1;
+				*result = CommandValue{ CommandValue::Type::Function, *(body_stack.rbegin()[skip].self)};
+			}
+			return 0;
+		}
+
+		auto excute_loop(const CommandASTLoopNode& loop, CommandValue* result) -> uint32_t {
+			if (loop.length > body_stack.size()) {
+				throw CommandException("Body doesn't exist.");
+			}
+			if (loop.argument != nullptr) {
+				CommandValue argument;
+				auto return_level = excute_expression(*(loop.argument), &argument);
+				if (return_level != 0) {
+					return return_level;
+				}
+				auto skip = loop.length - 1;
+				auto& target_stack = body_stack.rbegin()[skip];
+				target_stack.index = 0;
+				target_stack.owned_arguments = std::make_shared<std::vector<CommandValue>>(argument.type == CommandValue::Type::List ? std::move(std::get<std::vector<CommandValue>>(argument.value)) : std::vector{ argument });
+				target_stack.arguments = target_stack.owned_arguments.get();
+			}
+			requiring_loop = true;
+			return loop.length;
+		}
+
+	public: // get assignables.
+		auto get_assignable(const CommandASTExpressionNode& expression) -> std::pair<CommandValue&, bool> {
+			switch (expression.type) {
+			case CommandASTExpressionNode::Type::Identifier: {
+				return get_assignable_from_identifier(std::get<CommandASTIdentifierNode>(expression.value));
+			}
+			case CommandASTExpressionNode::Type::List: {
+				throw CommandException("List expression is not assignable.\nFuture feature: unpacking.");
+			}
+			case CommandASTExpressionNode::Type::Parentheses: {
+				return get_assignable_from_parentheses(std::get<CommandASTParenthesesNode>(expression.value));
+			}
+			case CommandASTExpressionNode::Type::Calling: {
+				return get_assignable_from_calling(std::get<CommandASTCallingNode>(expression.value));
+			}
+			case CommandASTExpressionNode::Type::Condition: {
+				return get_assignable_from_condition(std::get<CommandASTConditionNode>(expression.value));
+			}
+			case CommandASTExpressionNode::Type::Protection: {
+				return get_assignable_from_protection(std::get<CommandASTProtectionNode>(expression.value));
+			}
+			case CommandASTExpressionNode::Type::Accessing: {
+				return get_assignable_from_accessing(std::get<CommandASTAccessingNode>(expression.value));
+			}
+			default: {
+				throw CommandException("{} expression is not assignable", to_string(expression.type));
+			}
+			}
+		}
+
+		auto get_assignable_from_identifier(const CommandASTIdentifierNode& identifier) -> std::pair<CommandValue&, bool> {
+			return find_identifier_or_insert(identifier.name);
+		}
+
+		auto get_assignable_from_parentheses(const CommandASTParenthesesNode& parentheses) -> std::pair<CommandValue&, bool> {
+			return get_assignable(*(parentheses.expression));
+		}
+
+		auto get_assignable_from_calling(const CommandASTCallingNode& calling) -> std::pair<CommandValue&, bool> {
+			auto [callable, is_protected] = get_assignable(*(calling.callable));
+			CommandValue argument;
+			auto return_level = excute_expression(*(calling.argument), &argument);
+			if (return_level != 0) {
+				throw CommandException("Cannot return from assignable");
+			}
+			if (callable.type == CommandValue::Type::List) {
+				auto& list = std::get<std::vector<CommandValue>>(callable.value);
+				if (argument.type == CommandValue::Type::Number) {
+					auto index = std::llround(std::get<float>(argument.value));
+					if ((index < -static_cast<int64_t>(list.size())) || (index >= static_cast<int64_t>(list.size()))) {
+						throw CommandException("Index({}) out of range(-{}..{}).", index, list.size(), list.size());
+					}
+					if (index < 0) {
+						index += list.size();
+					}
+					return { list[index], is_protected };
+				}
+				else {
+					throw CommandException("Index must be a number.");
+				}
+			}
+			else {
+				throw CommandException("{} Calling is not assignable", to_string(callable.type));
+			}
+		}
+
+		auto get_assignable_from_condition(const CommandASTConditionNode& condition) -> std::pair<CommandValue&, bool> {
+			CommandValue condition_result;
+			if (condition.condition != nullptr) {
+				auto return_level = excute_expression(*(condition.condition), &condition_result);
+				if (return_level != 0) {
+					throw CommandException("Cannot return from assignable");
+				}
+			}
+			if ((condition_result.type == CommandValue::Type::Empty) && (!std::get<bool>(condition_result.value))) {
+				if (condition.false_branch != nullptr) {
+					return get_assignable(*(condition.false_branch));
+				}
+				else {
+					throw CommandException("Empty expression is not assignable.");
+				}
+			}
+			else {
+				if (condition.true_branch != nullptr) {
+					return get_assignable(*(condition.true_branch));
+				}
+				else {
+					throw CommandException("Empty expression is not assignable.");
+				}
+			}
+		}
+
+		auto get_assignable_from_protection(const CommandASTProtectionNode& protection) -> std::pair<CommandValue&, bool> {
+			auto name = get_identifier(*(protection.target));
+			auto [assignable, is_protected] = find_identifier_or_insert(name);
+			scope_stack.back().protections.insert(name);
+			return { assignable, is_protected };
+		}
+
+		auto get_assignable_from_accessing(const CommandASTAccessingNode& accessing) -> std::pair<CommandValue&, bool> {
+			CommandValue value;
+			auto return_level = excute_expression(*(accessing.expression), &value);
+			if (return_level != 0) {
+				throw CommandException("Cannot return from assignable");
+			}
+			switch (value.type)
+			{
+			case CommandValue::Type::String: {
+				return get_assignable_from_identifier(CommandASTIdentifierNode::make(std::get<std::string>(value.value)));
+			}
+			default:
+				throw CommandException("{} value type is not accessible.", to_string(value.type));
+				break;
+			}
+		}
+
+	public: // get identifiers.
+		auto get_identifier(const CommandASTExpressionNode& expression) -> std::string {
+			switch (expression.type) {
+			case CommandASTExpressionNode::Type::Identifier: {
+				return get_identifier_from_identifier(std::get<CommandASTIdentifierNode>(expression.value));
+			}
+			case CommandASTExpressionNode::Type::Parentheses: {
+				return get_identifier_from_parentheses(std::get<CommandASTParenthesesNode>(expression.value));
+			}
+			case CommandASTExpressionNode::Type::Condition: {
+				return get_identifier_from_condition(std::get<CommandASTConditionNode>(expression.value));
+			}
+			case CommandASTExpressionNode::Type::Accessing: {
+				throw CommandException("Unimplemented yet.");
+			}
+			default: {
+				throw CommandException("{} expression cannot be evaluated to an identifier.", to_string(expression.type));
+			}
+			}
+		}
+
+		auto get_identifier_from_identifier(const CommandASTIdentifierNode& identifier) -> std::string {
+			return identifier.name;
+		}
+
+		auto get_identifier_from_parentheses(const CommandASTParenthesesNode& parentheses) -> std::string {
+			return get_identifier(*(parentheses.expression));
+		}
+
+		auto get_identifier_from_condition(const CommandASTConditionNode& condition) -> std::string {
+			CommandValue condition_result;
+			if (condition.condition != nullptr) {
+				auto return_level = excute_expression(*(condition.condition), &condition_result);
+				if (return_level != 0) {
+					throw CommandException("Cannot return from assignable");
+				}
+			}
+			if ((condition_result.type == CommandValue::Type::Empty) && (!std::get<bool>(condition_result.value))) {
+				if (condition.false_branch != nullptr) {
+					return get_identifier(*(condition.false_branch));
+				}
+				else {
+					throw CommandException("Empty expression cannot be evaluated to an identifier.");
+				}
+			}
+			else {
+				if (condition.true_branch != nullptr) {
+					return get_identifier(*(condition.true_branch));
+				}
+				else {
+					throw CommandException("Empty expression cannot be evaluated to an identifier.");
+				}
+			}
+		}
+
+		auto get_identifier_from_accessing(const CommandASTAccessingNode& accessing) -> std::string {
+			CommandValue value;
+			auto return_level = excute_expression(*(accessing.expression), &value);
+			if (return_level != 0) {
+				throw CommandException("Cannot return from assignable");
+			}
+			switch (value.type)
+			{
+			case CommandValue::Type::String: {
+				return std::get<std::string>(value.value);
+			}
+			default:
+				throw CommandException("{} value type is not accessible.", to_string(value.type));
+				break;
+			}
 		}
 
 		CommandKernel() {
 			scope_stack.reserve(1000);
+			//body_stack.reserve(1000);
 		}
 	};
 }

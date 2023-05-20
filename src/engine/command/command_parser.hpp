@@ -13,6 +13,7 @@ namespace arx
 			String,
 			Separator,
 			Operator,
+			Condition,
 			Special,
 			FunctionRelated,
 			Eof,
@@ -30,6 +31,8 @@ namespace arx
 		{ "!=", 3 },
 		{ "<", 4 },
 		{ ">", 4 },
+		{ "<=", 4 },
+		{ ">=", 4 },
 		{ "+", 5 },
 		{ "-", 5 },
 		{ "*", 6 },
@@ -42,6 +45,7 @@ namespace arx
 
 	const std::unordered_map<std::string, int32_t> operator_right_precedence = {
 		{ "=", 1 },
+		{ "'%", 1 },
 		{ "'<", 1 },
 		{ ",", 1 },
 		{ "?", 1 },
@@ -49,7 +53,9 @@ namespace arx
 		{ "==", 3 },
 		{ "!=", 3 },
 		{ "<", 4 },
-		{ ">", 4},
+		{ ">", 4 },
+		{ "<=", 4 },
+		{ ">=", 4 },
 		{ "+", 5 },
 		{ "-", 5 },
 		{ "*", 6 },
@@ -57,6 +63,7 @@ namespace arx
 		{ "%", 6 },
 		{ "'+", 7 },
 		{ "'-", 7 },
+		{ "!", 7 },
 		{ "^", 8 },
 		{ "#", 9 },
 		{ "@", 9 },
@@ -101,6 +108,10 @@ namespace arx
 			}
 			case CommandToken::Type::Operator: {
 				parse_operator(token);
+				break;
+			}
+			case CommandToken::Type::Condition: {
+				parse_condition(token);
 				break;
 			}
 			case CommandToken::Type::Special: {
@@ -179,7 +190,7 @@ namespace arx
 
 		auto parse_brackets(const CommandToken& token) -> void {
 			if (token.value == "[") {
-				open_incomplete_expression(CommandASTExpressionNode::make_protection({ }));
+				open_incomplete_expression(CommandASTExpressionNode::make_protection(nullptr));
 			}
 			else if (token.value == "]") {
 				submit_preceding_expressions("]");
@@ -187,10 +198,7 @@ namespace arx
 				if (processing_nodes.top().type == CommandASTExpressionNode::Type::Protection) {
 					auto& protection = std::get<CommandASTProtectionNode>(processing_nodes.top().value);
 
-					if (awaiting_expression.type != CommandASTExpressionNode::Type::Identifier) {
-						throw CommandException("Only identifiers can be protected.");
-					}
-					protection.name = std::get<CommandASTIdentifierNode>(awaiting_expression.value).name;
+					protection.target = std::make_unique<CommandASTExpressionNode>(std::move(awaiting_expression));
 					awaiting_expression = CommandASTExpressionNode::make_empty();
 					submit_top_preceding();
 				}
@@ -267,18 +275,34 @@ namespace arx
 			auto op = token.value;
 			if (op == "=") {
 				submit_preceding_expressions("=");
-
-				if (awaiting_expression.type == CommandASTExpressionNode::Type::Identifier) {
-					std::string name = std::get<CommandASTIdentifierNode>(awaiting_expression.value).name;
-					awaiting_expression = CommandASTExpressionNode::make_empty();
-					open_incomplete_expression(CommandASTExpressionNode::make_assignment(name, { { }, { } }));
-				}
-				else {
-					throw CommandException("Unsupported assignment`=` usage. Assignment`=` must follow a indentifier name at this point.\n Future feature: tuple, accessor.");
-				}
+				auto assignment = CommandASTExpressionNode::make_assignment(std::make_unique<CommandASTExpressionNode>(std::move(awaiting_expression)), nullptr);
+				awaiting_expression = CommandASTExpressionNode::make_empty();
+				open_incomplete_expression(std::move(assignment));
+			}
+			else if (op == ":=") {
+				submit_preceding_expressions("=");
+				auto assignment = CommandASTExpressionNode::make_assignment(std::make_unique<CommandASTExpressionNode>(std::move(awaiting_expression)), nullptr, true);
+				awaiting_expression = CommandASTExpressionNode::make_empty();
+				open_incomplete_expression(std::move(assignment));
+			}
+			else if (op == "!") {
+				open_incomplete_expression(CommandASTExpressionNode::make_operation(to_operation_type(op), 1, { }));
+			}
+			else if (op == ">" || op == ">=" || op == "<" || op == "<=" || op == "==" || op == "!= ") {
+				submit_preceding_expressions(op);
+				auto expression = CommandASTExpressionNode::make_operation(to_operation_type(op), 2, {  });
+				auto& operation = std::get<CommandASTOperationNode>(expression.value);
+				operation.operands.push_back(std::move(awaiting_expression));
+				awaiting_expression = CommandASTExpressionNode::make_empty();
+				open_incomplete_expression(std::move(expression));
 			}
 			else if (op == "^" || op == "%") {
-				throw CommandException("Operators power`^` and modulo`%` are not supported yet.");
+				submit_preceding_expressions(op);
+				auto expression = CommandASTExpressionNode::make_operation(to_operation_type(op), 2, {  });
+				auto& operation = std::get<CommandASTOperationNode>(expression.value);
+				operation.operands.push_back(std::move(awaiting_expression));
+				awaiting_expression = CommandASTExpressionNode::make_empty();
+				open_incomplete_expression(std::move(expression));
 			}
 			else if (op == "+" || op == "-") {
 				if (awaiting_expression.type == CommandASTExpressionNode::Type::Empty) {
@@ -307,14 +331,36 @@ namespace arx
 				awaiting_expression = CommandASTExpressionNode::make_empty();
 				open_incomplete_expression(std::move(expression));
 			}
+			else {
+				throw CommandException("Unexpected Parser Error: {} is not an operator.", token.value);
+			}
+		}
+
+		auto parse_condition(const CommandToken& token) -> void {
+			auto op = token.value;
+			if (op == "?") {
+				submit_preceding_expressions("?");
+				auto condition = CommandASTExpressionNode::make_condition(std::make_unique<CommandASTExpressionNode>(std::move(awaiting_expression)), nullptr, nullptr);
+				awaiting_expression = CommandASTExpressionNode::make_empty();
+				open_incomplete_expression(std::move(condition));
+			}
+			else if (op == ":") {
+				submit_preceding_expressions(":");
+				if (processing_nodes.top().type != CommandASTExpressionNode::Type::Condition) {
+					throw CommandException("Unexpected Parser Error. No condition awaiting after submitting preceding expressions");
+				}
+			}
+			else {
+				throw CommandException("Unexpected Parser Error: {} is not a condition symbol.", token.value);
+			}
 		}
 
 		auto parse_special(const CommandToken& token) -> void {
 			if (token.value == "#") {
-				open_incomplete_expression(CommandASTExpressionNode::make_delete({ }));
+				open_incomplete_expression(CommandASTExpressionNode::make_delete(nullptr));
 			}
 			else if (token.value == "@") {
-				throw CommandException("Unsupported token: {}", token.value);;
+				open_incomplete_expression(CommandASTExpressionNode::make_accessing(nullptr));
 			}
 			else {
 				throw CommandException("Unexpected Parser Error: {} is not a special.", token.value);
@@ -324,22 +370,33 @@ namespace arx
 		auto parse_function_related(const CommandToken& token) -> void {
 			if (token.value[0] == '<') {
 				if (awaiting_expression.type != CommandASTExpressionNode::Type::Empty && token.value.size() == 1) {
-					throw CommandException("Compare operators are not implemented yet.");
+					parse_operator({ CommandToken::Type::Operator, "<" });
 				}
-
-				open_incomplete_expression(CommandASTExpressionNode::make_return(
-					token.value.length(), 
-					std::make_unique<CommandASTExpressionNode>(CommandASTExpressionNode::make_empty())
-				));
+				else {
+					open_incomplete_expression(CommandASTExpressionNode::make_return(
+						token.value.length(),
+						std::make_unique<CommandASTExpressionNode>(CommandASTExpressionNode::make_empty())
+					));
+				}
 			}
 			else if (token.value[0] == '>') {
 				if (awaiting_expression.type != CommandASTExpressionNode::Type::Empty && token.value.size() == 1) {
-					throw CommandException("Compare operators are not implemented yet.");
+					parse_operator({ CommandToken::Type::Operator, ">" });
 				}
-
-				submit_expression(CommandASTExpressionNode::make_argument(token.value.length()));
-				// Even though an argument expression can be further completed with a following identifier, it's already a complete expression.
-				// So it's not pushed into processing_nodes.
+				else {
+					submit_expression(CommandASTExpressionNode::make_argument(token.value.length()));
+				}
+			}
+			else if (token.value[0] == '$') {
+				submit_expression(CommandASTExpressionNode::make_self(token.value.length()));
+			}
+			else if (token.value[0] == '%') {
+				if (awaiting_expression.type != CommandASTExpressionNode::Type::Empty && token.value.size() == 1) {
+					parse_operator({ CommandToken::Type::Operator, "%" });
+				}
+				else {
+					open_incomplete_expression(CommandASTExpressionNode::make_loop(token.value.size(), nullptr));
+				}
 			}
 			else {
 				throw CommandException("Unsupported function related symbol: {}", token.value);
@@ -372,6 +429,38 @@ namespace arx
 						break;
 					}
 				}
+				else if (expression.type == CommandASTExpressionNode::Type::Condition) {
+					auto& condition = std::get<CommandASTConditionNode>(expression.value);
+					if (condition.true_branch == nullptr && condition.false_branch == nullptr) {
+						auto str_op = "?";
+						if (prior_to(operation, str_op)) {
+							break;
+						}
+
+						condition.true_branch = std::make_unique<CommandASTExpressionNode>(std::move(awaiting_expression));
+						awaiting_expression = CommandASTExpressionNode::make_empty();
+						if (operation != ":") {
+							submit_top_preceding();
+							++count;
+						}
+						else {
+							break;
+						}
+					}
+					else if (condition.true_branch != nullptr && condition.false_branch == nullptr) {
+						auto str_op = ":";
+						if (prior_to(operation, str_op)) {
+							break;
+						}
+						condition.false_branch = std::make_unique<CommandASTExpressionNode>(std::move(awaiting_expression));
+						awaiting_expression = CommandASTExpressionNode::make_empty();
+						submit_top_preceding();
+						++count;
+					}
+					else {
+						throw CommandException("Unexpected Parser Error. Illegal processing condition expression state: false_branch is already full.");
+					}
+				}
 				else if (expression.type == CommandASTExpressionNode::Type::Assignment) {
 					auto& assignment = std::get<CommandASTAssignmentNode>(expression.value);
 					auto str_op = "=";
@@ -392,7 +481,7 @@ namespace arx
 					}
 
 					if (awaiting_expression.type == CommandASTExpressionNode::Type::Identifier) {
-						del.name = std::get<CommandASTIdentifierNode>(awaiting_expression.value).name;
+						del.target = std::make_unique<CommandASTExpressionNode>(std::move(awaiting_expression));
 						awaiting_expression = CommandASTExpressionNode::make_empty();
 						submit_top_preceding();
 						++count;
@@ -400,6 +489,18 @@ namespace arx
 					else {
 						throw CommandException("Only identifiers can be deleted.");
 					}
+				}
+				else if (expression.type == CommandASTExpressionNode::Type::Accessing) {
+					auto& accessing = std::get<CommandASTAccessingNode>(expression.value);
+					auto str_op = "@";
+					if (prior_to(operation, str_op)) {
+						break;
+					}
+
+					accessing.expression = std::make_unique<CommandASTExpressionNode>(std::move(awaiting_expression));
+					awaiting_expression = CommandASTExpressionNode::make_empty();
+					submit_top_preceding();
+					++count;
 				}
 				else if (expression.type == CommandASTExpressionNode::Type::Return) {
 					auto& ret = std::get<CommandASTReturnNode>(expression.value);
@@ -427,15 +528,28 @@ namespace arx
 					submit_top_preceding();
 					++count;
 				}
-				else if (expression.type == CommandASTExpressionNode::Type::FunctionCall) {
-					auto& function_call = std::get<CommandASTFunctionCallNode>(expression.value);
+				else if (expression.type == CommandASTExpressionNode::Type::Calling) {
+					auto& calling = std::get<CommandASTCallingNode>(expression.value);
 					auto str_op = "f";
 					if (prior_to(operation, str_op)) {
 						break;
 					}
 
-					function_call.argument = std::make_unique<CommandASTExpressionNode>(std::move(awaiting_expression));
+					calling.argument = std::make_unique<CommandASTExpressionNode>(std::move(awaiting_expression));
 					awaiting_expression = CommandASTExpressionNode::make_empty();
+					submit_top_preceding();
+					++count;
+				}
+				else if (expression.type == CommandASTExpressionNode::Type::Loop) {
+					auto& loop = std::get<CommandASTLoopNode>(expression.value);
+					auto str_op = "'%";
+					if (prior_to(operation, str_op)) {
+						break;
+					}
+					if (awaiting_expression.type != CommandASTExpressionNode::Type::Empty) {
+						loop.argument = std::make_unique<CommandASTExpressionNode>(std::move(awaiting_expression));
+						awaiting_expression = CommandASTExpressionNode::make_empty();
+					}
 					submit_top_preceding();
 					++count;
 				}
@@ -462,7 +576,7 @@ namespace arx
 			if (awaiting_expression.type != CommandASTExpressionNode::Type::Empty) {
 				submit_preceding_expressions("f");
 				if (awaiting_expression.type != CommandASTExpressionNode::Type::Empty) {
-					processing_nodes.push(CommandASTExpressionNode::make_function_call(
+					processing_nodes.push(CommandASTExpressionNode::make_calling(
 						std::make_unique<CommandASTExpressionNode>(std::move(awaiting_expression)),
 						nullptr
 					));
@@ -479,7 +593,7 @@ namespace arx
 			if (awaiting_expression.type != CommandASTExpressionNode::Type::Empty) { // Turn the previous expression into a function call.
 				submit_preceding_expressions("f");
 				if (awaiting_expression.type != CommandASTExpressionNode::Type::Empty) {
-					processing_nodes.push(CommandASTExpressionNode::make_function_call(
+					processing_nodes.push(CommandASTExpressionNode::make_calling(
 						std::make_unique<CommandASTExpressionNode>(std::move(awaiting_expression)),
 						{ }
 					));
@@ -715,23 +829,56 @@ namespace arx
 				else if (is_separator(c)) {
 					parser << CommandToken{ CommandToken::Type::Separator, std::string(1, c) };
 				}
-				else if (is_operator(c)) {
-					parser << CommandToken{ CommandToken::Type::Operator, std::string(1, c) };
-				}
-				else if (is_special(c)) {
-					parser << CommandToken{ CommandToken::Type::Special, std::string(1, c) };
-				}
 				else if (is_function_related(c)) {
 					std::string full;
-					while (is_function_related(c)) {
+					char h = c;
+					while (h == c) {
 						full += c;
 						if (++iter == input.end()) {
 							break;
 						}
 						c = *iter;
 					}
-					--iter;
-					parser << CommandToken{ CommandToken::Type::FunctionRelated, full };
+
+					if (c == '=' && full.size() == 1 && (h == '<' || h == '>')) {
+						full += '=';
+						parser << CommandToken{ CommandToken::Type::Operator, full };
+					}
+					else {
+						--iter;
+						parser << CommandToken{ CommandToken::Type::FunctionRelated, full };
+					}
+				}
+				else if (is_comparator(c)) {
+					++iter;
+					auto s = *iter;
+					if (s == '=') {
+						parser << CommandToken{ CommandToken::Type::Operator, std::string({ c, s }) };
+					}
+					else {
+						--iter;
+						parser << CommandToken{ CommandToken::Type::Operator, std::string(1, c) };
+					}
+				}
+				else if (is_operator(c)) {
+					parser << CommandToken{ CommandToken::Type::Operator, std::string(1, c) };
+				}
+				else if (c == ':') {
+					++iter;
+					auto s = *iter;
+					if (s == '=') {
+						parser << CommandToken{ CommandToken::Type::Operator, std::string({ c, s }) };
+					}
+					else {
+						--iter;
+						parser << CommandToken{ CommandToken::Type::Condition, std::string(1, c) };
+					}
+				}
+				else if (is_condition(c)) {
+					parser << CommandToken{ CommandToken::Type::Condition, std::string(1, c) };
+				}
+				else if (is_special(c)) {
+					parser << CommandToken{ CommandToken::Type::Special, std::string(1, c) };
 				}
 				else if (is_eof(c)) {
 					parser << CommandToken{ CommandToken::Type::Eof, std::string(1, c) };
@@ -773,14 +920,20 @@ namespace arx
 		auto is_separator(char c) -> bool {
 			return c == '(' || c == ')' || c == '{' || c == '}' || c == '[' || c == ']' || c == ',' || c == ';';
 		}
+		auto is_comparator(char c) -> bool {
+			return c == '<' || c == '>' || c == '=' || c == '!';
+		}
+		auto is_function_related(char c) -> bool {
+			return c == '$' || c == '%' || c == '<' || c == '>'; // Cenvrons are not used as brackets in ACL.
+		}
 		auto is_operator(char c) -> bool {
 			return c == '+' || c == '-' || c == '*' || c == '/' || c == '%' || c == '^' || c == '=';
 		}
-		auto is_special(char c) -> bool {
-			return c == '!' || c == '#' || c == '@' || c == '&' || c == '|' || c == '~' || c == '`' || c == '?' || c == ':' ;
+		auto is_condition(char c) -> bool {
+			return c == '?' || c == ':';
 		}
-		auto is_function_related(char c) -> bool {
-			return c == '$' || c == '<' || c == '>'; // Cenvrons are not used as brackets in ACL.
+		auto is_special(char c) -> bool {
+			return c == '!' || c == '#' || c == '@' || c == '&' || c == '|' || c == '~' || c == '`';
 		}
 		auto is_eof(char c) -> bool {
 			return c == '\0';

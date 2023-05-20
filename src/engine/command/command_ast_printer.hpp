@@ -78,15 +78,15 @@ namespace arx
 				print_expression(*(std::get<CommandASTParenthesesNode>(expression.value).expression), indent + 1);
 				break;
 			}
-			case arx::CommandASTExpressionNode::Type::FunctionCall:
+			case arx::CommandASTExpressionNode::Type::Calling:
 			{
-				auto& function_call = std::get<CommandASTFunctionCallNode>(expression.value);
+				auto& calling = std::get<CommandASTCallingNode>(expression.value);
 				print_indent(indent + 1);
-				std::cout << "function = ";
-				print_expression(*(function_call.function_body), indent + 1);
+				std::cout << "callable = ";
+				print_expression(*(calling.callable), indent + 1);
 				print_indent(indent + 1);
 				std::cout << "argument = ";
-				print_expression(*(function_call.argument), indent + 1);
+				print_expression(*(calling.argument), indent + 1);
 				break;
 			}
 			case arx::CommandASTExpressionNode::Type::FunctionBody:
@@ -99,11 +99,34 @@ namespace arx
 				}
 				break;
 			}
+			case arx::CommandASTExpressionNode::Type::Condition:
+			{
+				auto& condition = std::get<CommandASTConditionNode>(expression.value);
+				print_indent(indent + 1);
+				std::cout << "condition = ";
+				print_expression(*(condition.condition), indent + 1);
+				if (condition.true_branch != nullptr) {
+					print_indent(indent + 1);
+					std::cout << "true_branch = ";
+					print_expression(*(condition.true_branch), indent + 1);
+				}
+				if (condition.false_branch != nullptr) {
+					print_indent(indent + 1);
+					std::cout << "false_branch = ";
+					print_expression(*(condition.false_branch), indent + 1);
+				}
+				break;
+			}
 			case arx::CommandASTExpressionNode::Type::Assignment:
 			{
 				auto& assignment = std::get<CommandASTAssignmentNode>(expression.value);
+				if (assignment.local) {
+					print_indent(indent + 1);
+					std::cout << "local" << std::endl;
+				}
 				print_indent(indent + 1);
-				std::cout << "identifier = " << assignment.name << std::endl;
+				std::cout << "target = ";
+				print_expression(*(assignment.target), indent + 1);
 				print_indent(indent + 1);
 				std::cout << "expression = ";
 				print_expression(*(assignment.expression), indent + 1);
@@ -112,24 +135,49 @@ namespace arx
 			case arx::CommandASTExpressionNode::Type::Protection:
 			{
 				print_indent(indent + 1);
-				std::cout << "identifier = " << std::get<CommandASTProtectionNode>(expression.value).name << std::endl;
+				std::cout << "target = ";
+				print_expression(*(std::get<CommandASTProtectionNode>(expression.value).target), indent + 1);
 				break;
 			}
 			case arx::CommandASTExpressionNode::Type::Delete:
 			{
 				print_indent(indent + 1);
-				std::cout << "identifier = " << std::get<CommandASTDeleteNode>(expression.value).name << std::endl;
+				std::cout << "target = ";
+				print_expression(*(std::get<CommandASTDeleteNode>(expression.value).target), indent + 1);
 				break;
 			}
 			case arx::CommandASTExpressionNode::Type::Argument:
 			{
+				print_indent(indent + 1);
+				std::cout << "length = " << std::get<CommandASTArgumentNode>(expression.value).length << std::endl;
 				break;
 			}
 			case arx::CommandASTExpressionNode::Type::Return:
 			{
+				auto& returning = std::get<CommandASTReturnNode>(expression.value);
+				print_indent(indent + 1);
+				std::cout << "length = " << returning.length << std::endl;
 				print_indent(indent + 1);
 				std::cout << "expression = ";
-				print_expression(*(std::get<CommandASTReturnNode>(expression.value).expression), indent + 1);
+				print_expression(*(returning.expression), indent + 1);
+				break;
+			}
+			case arx::CommandASTExpressionNode::Type::Self:
+			{
+				print_indent(indent + 1);
+				std::cout << "length = " << std::get<CommandASTSelfNode>(expression.value).length << std::endl;
+				break;
+			}
+			case arx::CommandASTExpressionNode::Type::Loop:
+			{
+				auto& loop = std::get<CommandASTLoopNode>(expression.value);
+				print_indent(indent + 1);
+				std::cout << "length = " << loop.length << std::endl;
+				if (std::get<CommandASTLoopNode>(expression.value).argument != nullptr) {
+					print_indent(indent + 1);
+					std::cout << "argument = ";
+					print_expression(*(loop.argument), indent + 1);
+				}
 				break;
 			}
 			default:

@@ -1,1 +1,1 @@
-add_executable(CommandTest CommandTest.cpp)
+add_executable(arxemand arxemand.cpp)
