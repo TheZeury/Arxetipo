@@ -15,6 +15,15 @@ auto main(int argument_count, char* arguments[]) -> int {
 			file.open(argument.data());
 			break;
 		}
+		else if (argument == "-h" || argument == "--help") {
+			std::cout << "Usage: arxemand [options] [file] [script arguments]" << std::endl;
+			std::cout << "Options:" << std::endl;
+			std::cout << "  -h, --help\t\t\tShow this help message and exit" << std::endl;
+			std::cout << "  -a, --ast\t\t\tPrint the AST of the program and exit" << std::endl;
+			std::cout << "  -n, --no-basic\t\tDo not load the basic library" << std::endl;
+			std::cout << "  --lib=<name>[,<name>...]\tLoad the specified libraries" << std::endl;
+			return 0;
+		}
 		else if (argument == "-a" || argument == "--ast") {
 			ast_mode = true;
 		}
@@ -25,25 +34,25 @@ auto main(int argument_count, char* arguments[]) -> int {
 			std::string name;
 			for (const char c : argument.substr(6)) {
 				if (c == ',') {
-					libraries.insert("name");
+					libraries.insert(name);
 					name.clear();
 				}
 				else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c == '_')) {
 					name += c;
 				}
 				else {
-					std::cerr << "Invalid library name: " << name << std::endl;
+					std::cerr << "Invalid library name: " << (name += c) << std::endl;
 					return 1;
 				}
 			}
 			if (!name.empty()) {
-				libraries.insert("name");
+				libraries.insert(name);
 			}
 		}
 	}
 
 	if (ast_mode) {
-		arx::CommandASTPrinterRuntime runtime;
+		arx::CommandASTPrinterRuntime runtime{ file.is_open() ? file : std::cin, std::cout };
 		runtime.run();
 	} else {
 		arx::CommandRuntime runtime{ file.is_open() ? file : std::cin, std::cout };

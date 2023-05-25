@@ -670,13 +670,13 @@ namespace arx
 				}
 				body_callable(std::shared_ptr<CommandASTFunctionBodyNode> body, CommandKernel& kernel) : body(body), kernel(kernel) { }
 				body_callable(const body_callable& other) : body(other.body), kernel(other.kernel) { }
-				body_callable(body_callable&& other) : body(std::move(other.body)), kernel(other.kernel) { }
+				body_callable(body_callable&& other) noexcept : body(std::move(other.body)), kernel(other.kernel) { }
 				auto operator=(const body_callable& other) -> body_callable& {
 					body = other.body;
 					kernel = other.kernel;
 					return *this;
 				}
-				auto operator=(body_callable&& other) -> body_callable& {
+				auto operator=(body_callable&& other) noexcept  -> body_callable& {
 					body = std::move(other.body);
 					kernel = other.kernel;
 					return *this;

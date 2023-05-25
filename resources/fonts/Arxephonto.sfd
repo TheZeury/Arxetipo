@@ -1,0 +1,99 @@
+SplineFontDB: 3.2
+FontName: Arxephonto
+FullName: Arxephonto
+FamilyName: Arxephonto
+Weight: Regular
+Copyright: Copyright (c) 2023, Zeury
+UComments: "2023-4-18: Created with FontForge (http://fontforge.org)"
+Version: 001.000
+ItalicAngle: 0
+UnderlinePosition: -102.4
+UnderlineWidth: 51.2
+Ascent: 819
+Descent: 205
+InvalidEm: 0
+LayerCount: 2
+Layer: 0 0 "Back" 1
+Layer: 1 0 "Fore" 0
+XUID: [1021 59 1298700198 7773]
+OS2Version: 0
+OS2_WeightWidthSlopeOnly: 0
+OS2_UseTypoMetrics: 1
+CreationTime: 1681821450
+ModificationTime: 1681827560
+OS2TypoAscent: 0
+OS2TypoAOffset: 1
+OS2TypoDescent: 0
+OS2TypoDOffset: 1
+OS2TypoLinegap: 0
+OS2WinAscent: 0
+OS2WinAOffset: 1
+OS2WinDescent: 0
+OS2WinDOffset: 1
+HheadAscent: 0
+HheadAOffset: 1
+HheadDescent: 0
+HheadDOffset: 1
+OS2Vendor: 'PfEd'
+MarkAttachClasses: 1
+DEI: 91125
+LangName: 1033
+Encoding: ISO8859-1
+UnicodeInterp: none
+NameList: AGL For New Fonts
+DisplaySize: -48
+AntiAlias: 1
+FitToEm: 0
+WinInfo: 0 27 8
+BeginPrivate: 0
+EndPrivate
+TeXData: 1 0 0 346030 173015 115343 0 1048576 115343 783286 444596 497025 792723 393216 433062 380633 303038 157286 324010 404750 52429 2506097 1059062 262144
+BeginChars: 256 2
+
+StartChar: A
+Encoding: 65 65 0
+Width: 632
+VWidth: 1000
+Flags: HW
+LayerCount: 2
+Fore
+SplineSet
+632 819 m 1
+ 632 0 l 1
+ 510 0 l 1
+ 510 654 l 5
+ 399 654 l 1
+ 146 0 l 1
+ 0 0 l 1
+ 330 819 l 1
+ 632 819 l 1
+EndSplineSet
+EndChar
+
+StartChar: B
+Encoding: 66 66 1
+Width: 632
+Flags: HW
+LayerCount: 2
+Fore
+SplineSet
+379 726 m 25
+ 545 726 l 25
+ 547 542 l 1
+ 274 392 l 25
+ 529 334 l 1
+ 529 78 l 25
+ 135 78 l 25
+ 379 726 l 25
+286 822 m 25
+ -8 2 l 25
+ 630 0 l 25
+ 632 362 l 1
+ 436 412 l 29
+ 632 494 l 1
+ 632 820 l 25
+ 286 822 l 25
+EndSplineSet
+EndChar
+EndChars
+EndSplineFont

@@ -13,7 +13,7 @@ namespace arx
 
 		bool exit = false;
 
-		CommandRuntime(std::istream& input, std::ostream& output, std::ostream& error = std::cerr) : input{ input }, output{ output }, error{ error }, kernel{}, parser{ kernel }, lexer{ parser } {
+		CommandRuntime(std::istream& input, std::ostream& output, std::ostream& error = std::cerr) : input{ input }, output{ output }, error{ error }, kernel{ }, parser{ kernel }, lexer{ parser } {
 		}
 
 		auto load_library(CommandLibrary&& library) -> void {
@@ -25,10 +25,10 @@ namespace arx
 				output.flush();
 				std::string line;
 				std::getline(input, line);
+				run_code(line);
 				if (input.eof()) {
 					break;
 				}
-				run_code(line);
 			}
 			return 0;
 		}

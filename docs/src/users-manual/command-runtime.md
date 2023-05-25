@@ -16,6 +16,8 @@ developers still need to write real codes in C++.
 A major philosophy of it's design is to not reserve any keywords, 
 which may make it's syntax a little bit confusing at first.
 
+`(*)` in this document means the feature is not implemented yet.
+
 ## How to excute
 
 ### Standalone Analyzer
@@ -24,7 +26,7 @@ To have a quick start,
 there's a complete CLI analyzer : src/lab_game/arxemand.cpp.
 
 ```
-.\arxemand [options] [file path]
+.\arxemand [options] [file path] [script arguments(*)]
 ```
 
 If the file path is not provided, it will run in interactive mode.
@@ -35,14 +37,10 @@ so for now, this analyzer is only for demostration.
 #### Options:
 
 ```
--a, --ast
-	Print AST instead of executing the script.
-
---lib=lib_1,lib_2,...
-    Load built-in libraries.
-
--n, --no-basic
-	Do not load the built-in basic library.
+-h, --help                    Show this help message and exit
+-a, --ast                     Print the AST of the program and exit
+-n, --no-basic                Do not load the basic library
+--lib=<name>[,<name>...]      Load the specified libraries
 ```
 
 #### Built-in libraries:
@@ -55,8 +53,8 @@ Basic library is loaded by default.
 print,
 read,
 exit,
-math, // marco to load math library
-string, // marco to load string library
+math, // a marco to load the math library
+string, // a marco to load the string library
 ```
 
 ##### Math
@@ -87,11 +85,11 @@ join, // join(array, separator)
 parse, // parse to number
 ```
 
-### Integarting
+### Integrating
 
 To integrate the analyzer into your programs, choices are:
 
-#### Choice 1. Using provided runtime
+#### Choice 1. Using a provided runtime
 
 Simply provide where the code is read from and where the output is written to 
 (and optionally where the error is printed to) to the runtime
@@ -143,11 +141,13 @@ but an implementation.
 You can implement your own `print` function like this:
 
 ```cpp
-kernel.add_function("print", [&](const std::vector<CommandValue>& arguments, CommandValue& result) {
+kernel.add_function("print", [&](const std::vector<CommandValue>& arguments, CommandValue* result) {
     for (const auto& argument : arguments) {
         std::cout << argument.to_string() << std::endl;
     }
-    result = CommandValue{ CommandValue::Type::Empty, std::monostate{ } };
+    if (result != nullptr) {
+        *result = CommandValue{ CommandValue::Type::Empty, std::monostate{ } };
+    }
 }, true);
 ```
 
@@ -194,8 +194,8 @@ kernel << statement;
 
 A practical usage of the full control is to get AST from the parser for other purposes.
 
-You can pass your interpreter to the parser 
-as long as the type implemented `operator<<(const CommandASTStatementNode&)`:
+You can pass your own interpreters to the parser 
+as long as they implemented `operator<<(const CommandASTStatementNode&)`:
 
 ```cpp
 struct MyInterpreter {
@@ -249,9 +249,47 @@ A defined behavior that takes **one** argument and returns **one** value.
 A called macro will **not** create a new scope,
 any identifiers and protections defined in the scope will **not** be destroyed after the macro returns.
 
+### Static Expression(*)
+
+A static expression of a function or a macro is an expression which is evaluated at the time the function is generated.
+
+All static expressions in a function body share the same scope 
+which is added on top of the scope where the function is generated when generating,
+and then stored in the function.
+
+Static expressions don't have their own body(where arguments and return values are stored when calling a function/macro),
+but they are using the body where the function is generated.
+So fetching arguments will fetch the arguments of the generator.
+
+```
+generate_print = {
+    < { print \>; }; // The `\>` fetches the argument of `generate_print`, instead of the defind function.
+};
+
+p = generate_print "Hello World!";
+p(); // Output: Hello World!
+```
+
+And you can specify the identifiers defined in a function/macro's static expressions using `.`:
+
+```
+s = {
+    \ name = "S";
+    \ level = 19;
+    print("name: " + name + ", level: " + level);
+};
+
+s(); // Output: name: S, level: 19
+
+s.name = "Sakura";
+s.level = 3;
+
+s(); // Output: name: Sakura, level: 3
+```
+
 ### Operations
 
-All operations rules(`value` means any value; if a situation satisfies multiple rules below, the first rule applies):
+All operation rules(`value` means any value; if a situation satisfies multiple rules below, the first one applies):
 
 #### Positive
 
@@ -287,7 +325,7 @@ value - (+)/(-) = value
 1 - 2 = -1
 ```
 
-### Multiplication
+#### Multiplication
 
 ```
 (+) * (-) = (-)
@@ -299,13 +337,13 @@ value - (+)/(-) = value
 number * (+)/(-) = +/- number;
 ```
 
-### Division
+#### Division
 
 ```
 7 / 2 = 3.5
 ```
 
-### Modulo
+#### Modulo
 
 ```
 number_1 % number_2 = fmod(number_1, number_2)
@@ -313,13 +351,13 @@ number_1 % number_2 = fmod(number_1, number_2)
 -2 % 3 = -2
 ```
 
-### Power
+#### Power
 
 ```
 2 ^ 3 = 8
 ```
 
-### Comparison
+#### Comparison
 
 ```
 (+) == (+) = (+)
@@ -347,7 +385,7 @@ number_1 % number_2 = fmod(number_1, number_2)
 print == print = (+)
 print == exit = (-)
 
-\```
+\``` (*)
 get_f = { < { ... }; };
 a = get_f();
 b = get_f();
@@ -358,7 +396,20 @@ a = f;
 b = f;
 print(a == b) // Output: (+)
 
-// A function equals to itself, but not to another function generated by the same code.
+// A function without static expresssions equals to itself, but not to another function generated by the same code.
+
+f = { \ value = 0; };
+a = f;
+b = f;
+print(a == b); // Output: (+)
+b.value = 1;
+print(a == b); // Output: (-) 
+a.value = 1;
+print(a == b); // Output: (+)
+
+// Functions with static expressions are equal 
+// if they branch from the same source
+// and their static expressions are all equal.
 
 f = { ... };
 m = @f;
@@ -434,7 +485,7 @@ print(l(-2)); // Output: 2
 print(l(-3)); // Output: 1
 print(l(-4)); // Error: Index out of range.
 l(2) = 4;
-print(l); 
+print l; 
 // Output: 
 // 1
 // 2
@@ -489,29 +540,29 @@ All expressions can be evaluated to a result value.
 
 The following expressions can be evaluated to an assignable:
 
-```
-identifier, always.
-parentheses, if the inner expression can be evaluated to an assignable.
-list, ##### Unimplemented Feature: unpacking ##### if all elements can be evaluated to an assignable.
-calling, if the callable can be evaluated to an assignable list.
-condition, if the selected branch can be evaluated to an assignable.
-protection, if the protected expression can be evaluated to an assignable.
-accessing, if the accessed expression's result value is a string.
-```
+
+1. identifier, always.
+2. parentheses, if the inner expression can be evaluated to an assignable.
+3. list, if all it's elements can be evaluated to an assignable. (*) ##### Unimplemented Feature: unpacking ##### 
+4. calling, if the callable can be evaluated to an assignable list.
+5. condition, if the selected branch can be evaluated to an assignable.
+6. protection, if the protected expression can be evaluated to an assignable.
+7. accessing, if the accessed expression's result value is a string.
+
 
 #### Identifier
 
 The following expressions can be evaluated to an identifier:
 
-```
-identifier, always.
-parentheses, if the inner expression can be evaluated to an identifier.
-condition, if the selected branch can be evaluated to an identifier.
-accessing, if the accessed expression's result value is a string.
-```
+
+1. identifier, always.
+2. parentheses, if the inner expression can be evaluated to an identifier.
+3. condition, if the selected branch can be evaluated to an identifier.
+4. accessing, if the accessed expression's result value is a string.
+
 
 Note that a protection **cannot** be evaluated to an identifier
-despite that the expression it protects must be evaluated to an identifier.
+despite that the expression it protects must be evaluated to an identifier(see [Syntex: Expressions: Protect](#protect)).
 The reason is, when evaluating an identifier,
 we only care about the "name",
 yet the exact value is still uncertain.
@@ -588,12 +639,12 @@ right_precedence :
 '- is `Negative`
 f is `Calling` 
 // `f` for function, but it's not necessarily a function. 
-// I'm not using `c` because `c`'s meaning is more ambiguous that `f`.
+// I'm not using `c` because `c`'s meaning is more ambiguous than `f`.
 ```
 
 #### Assignment
 
-`target = expression;`
+`target = expression`
 
 `target` must be evaluated to an `assignable`. See [Semantices: Expression Evaluation](#expression-evaluation).
 
@@ -607,7 +658,7 @@ d = ();
 
 #### Local Assignment
 
-`target := expression;`
+`target := expression`
 
 `target` must be evaluated to an `identifier`. See [Semantices: Expression Evaluation](#expression-evaluation).
 
@@ -615,7 +666,7 @@ Different from common assignment,
 local assignment will not affect the outer scopes.
 
 It doesn't care if the identifier is already defined in the outer scopes.
-A indentifier defined by local assignment is always a different one 
+An identifier defined by local assignment is always a different one 
 if there's already one with the same name in the outer scopes.
 
 It's suggested to always use local assignments in the defination of function bodies
@@ -743,6 +794,8 @@ It's recommended to use parentheses to wrap a list expression to avoid confusion
 
 #### Function Body
 
+`{ statement_0; statement_1; ... }`
+
 A function body returns a **function** which is a value.
 
 A function body itself is **not** excuted, 
@@ -760,11 +813,11 @@ print(add(3, 5));
 // Since a function body returns a function, it can be called directly.
 ```
 
-Note: functions are not closures, 
-they don't have access to the environment where they are defined.
+#### Static Expression(*)
 
-I currently don't have a good idea to implement closures in Arxemand. 
-Maybe a special symbol to catch the environment identifiers?
+`\ expression`
+
+See: [Semantics: Static Expression](#static-expression)]
 
 #### Operation
 
@@ -1109,46 +1162,4 @@ See [Semantics: Accessing](#accessing).
 
 ### Examples
 
-#### Fibonacci
-
-```
-fib = {
-    >n;
-    < n ? $(n - 1) + ( n - 1 ? $(n - 2) : 1 ) : 0;
-};
-
-print(fib(10)); // 55
-```
-
-```
-fib = {
-    >n;
-    < n ? {
-        >i; >a; >b;
-        < n - i ? $(i + 1, b, a + b) : a + b;
-    }(1, 1, 0) : 0;
-};
-
-print(fib(12)); // 144
-```
-
-#### Euclid's algorithm
-
-```
-gcd = {
-    >a;
-    >b;
-    < b ? $(b, a % b) : a;
-};
-
-print(gcd(10, 15)); // 5
-```
-
-#### Factorial
-
-```
-fact = {
-    >n;
-    < n ? n * $(n - 1) : 1;
-};
-```
+to be done.

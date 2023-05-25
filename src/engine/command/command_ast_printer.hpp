@@ -4,6 +4,8 @@ namespace arx
 {
 	struct CommandASTPrinter
 	{
+		std::ostream& output;
+
 		auto operator<<(const CommandASTStatementNode& statement) -> CommandASTPrinter& {
 			print_indent(0);
 			print_statement(statement, 0);
@@ -197,22 +199,25 @@ namespace arx
 
 	struct CommandASTPrinterRuntime
 	{
+		std::istream& input;
+		std::ostream& output;
+		std::ostream& error;
+
 		CommandASTPrinter printer;
 		CommandParser<CommandASTPrinter> parser;
 		CommandLexer<CommandASTPrinter> lexer;
 
-		CommandASTPrinterRuntime() : printer{}, parser{ printer }, lexer{ parser } {
-
+		CommandASTPrinterRuntime(std::istream& input, std::ostream& output, std::ostream& error = std::cerr) : input{ input }, output{ output }, error{ error }, printer{ output }, parser{ printer }, lexer{ parser } {
 		}
 
 		auto run() -> void {
 			while (true) {
 				std::string line;
-				std::getline(std::cin, line);
-				if (std::cin.eof()) {
+				std::getline(input, line);
+				run_code(line);
+				if (input.eof()) {
 					break;
 				}
-				run_code(line);
 			}
 		}
 
@@ -221,7 +226,7 @@ namespace arx
 				lexer << code;
 			}
 			catch (const CommandException& exception) {
-				std::cerr << exception.what() << std::endl;
+				error << exception.what() << std::endl;
 				parser.awaiting_expression = CommandASTExpressionNode::make_empty();
 				while (parser.processing_nodes.size() > 1) {
 					parser.processing_nodes.pop();
